@@ -31,7 +31,8 @@
 
 module Robots.Genetic.HunterKiller.World
 
-  (worldCycle)
+  (worldCycle,
+   generateRobot)
   
 where
 
@@ -51,9 +52,9 @@ import Data.Foldable (Foldable,
 import System.Random as Random
 
 -- | Execute a world cycle.
-worldCycle :: State.State RobotWorld Bool
+worldCycle :: State.State RobotWorld RobotCycleState
 worldCycle = do
-  world <- get
+  world <- State.get
   let params = robotWorldParams world
   cycleEndStates <-
     mapM (\robot -> (\output -> (robot, output)) <$> robotCycle robot)
@@ -67,11 +68,13 @@ worldCycle = do
       shots = robotWorldShots world >< newShots
       updatedShots = collectJust $ fmap (\shot -> updateShot shot params) shots
   collideRobotsAndShots robots updatedShots
-  State.state $ \world ->
-    world { robotWorldCycles = robotWorldCycles world + 1 }
-  world <- get
-  return $ (robotWorldCycles world >= robotParamsMaxCycles params) ||
-    (robotWorldKills world >= robotParamsMaxKills params))
+  State.modify $ \world ->
+                   world { robotWorldCycles = robotWorldCycles world + 1 }
+  world <- State.get
+  if (robotWorldCycles world >= robotParamsMaxCycles params) ||
+     (robotWorldKills world >= robotParamsMaxKills params)
+    then return RobotEndRound
+    else return RobotNextCycle
 
 -- | Collide robots and shots.
 collideRobotsAndShots :: Seq.Seq Robot -> Seq.Seq Shot ->
@@ -94,7 +97,7 @@ collideRobotWithShots :: Robot -> Seq.Seq Shot ->
                          State.State RobotWorld
                            (Robot, Seq.Seq Shot, Seq.Seq Int)
 collideRobotWithShots robot shots = do
-  params <- robotWorldParams <$> get
+  params <- robotWorldParams <$> State.get
   let (shotsThatHit, shotsThatDidNotHit) =
         Seq.partition
           (\shot ->
@@ -132,49 +135,58 @@ collideRobotWithShots robot shots = do
 -- | Respawn a robot
 respawnRobot :: Robot -> State.State RobotWorld Robot
 respawnRobot robot = do
-  world <- get
-  let params = robotWorldParams params
+  world <- State.get
+  let params = robotWorldParams world
       index = robotWorldNextRobotIndex world
-      random = robotWorldRandom world
-      (generalEnergy, random') =
+      program = robotExpr robot
+      score = robotScore robot
+      gen = robotWorldRandom world
+      (robot, gen') = generateRobot index program (score - 1) gen params
+  State.modify $ (\world -> world { robotWorldNextRobotIndex = index + 1,
+                                    robotWorldRandom = gen' })
+  return robot
+
+-- | Generate a robot.
+generateRobot :: Int -> RobotExpr -> Int -> RobotParams -> Random.StdGen ->
+                 (Robot, Random.StdGen)
+generateRobot index program score gen params = 
+  let (generalEnergy, gen') =
         Random.randomR (robotParamsMinInitialGeneralEnergy params,
-                        robotParamsMaxInitialGeneralEnergy params) random
-      (weaponEnergy, random'') =
+                        robotParamsMaxInitialGeneralEnergy params) gen
+      (weaponEnergy, gen'') =
         Random.randomR (robotParamsMinInitialWeaponEnergy params,
-                        robotParamsMaxInitialWeaponEnergy params) random'
-      (health, random''') =
+                        robotParamsMaxInitialWeaponEnergy params) gen'
+      (health, gen''') =
         Random.randomR (robotParamsMinInitialHealth params,
-                        robotParamsMaxInitialHealth params) random''
-      (locationDeltaAbs, random'''') =
+                        robotParamsMaxInitialHealth params) gen''
+      (locationDeltaAbs, gen'''') =
         Random.randomR (robotParamsMinInitialLocationDeltaAbs params,
-                        robotParamsMaxInitialLocationDeltaAbs params) random'''
-      (rotationDelta, random''''') =
+                        robotParamsMaxInitialLocationDeltaAbs params) gen'''
+      (rotationDelta, gen''''') =
         Random.randomR (-(robotParamsMinInitialRotationDeltaAbs params),
-                        robotParamsMaxInitialRotationDeltaAbs params)
-          random''''
-      (locationX, random'''''') = Random.randomR (-0.5, 0.5) random'''''
-      (locationY, random''''''') = Random.randomR (-0.5, 0.5) random''''''
-      (rotation, random'''''''') = Random.randomR (-pi, pi) random'''''''
-      (locationDeltaAngle, random''''''''') =
-        Random.randomR (-pi, pi) random''''''''
+                        robotParamsMaxInitialRotationDeltaAbs params) gen''''
+      (locationX, gen'''''') = Random.randomR (-0.5, 0.5) gen'''''
+      (locationY, gen''''''') = Random.randomR (-0.5, 0.5) gen''''''
+      (rotation, gen'''''''') = Random.randomR (-pi, pi) gen'''''''
+      (locationDeltaAngle, gen''''''''') = Random.randomR (-pi, pi) gen''''''''
       locationX' = wrapDim locationX
       locationY' = wrapDim locationY
       locationDeltaX = cos locationDeltaAngle * locationDeltaAbs
       locationDeltaY = sin locationDeltaAngle * locationDeltaAbs
       rotation' = normalizeAngle rotation
-  state $ (\world -> world { robotWorldNextRobotIndex = index + 1,
-                             robotWorldRandom = random''''''''' })
-  return $ robot { robotIndex = index,
-                   robotData = RobotNull,
-                   robotLocation = (locationX', locationY'),
-                   robotLocationDelta = (locationDeltaX, locationDeltaY),
-                   robotRotation = rotation,
-                   robotRotationDelta = rotationDelta,
-                   robotGeneralEnergy = generalEnergy,
-                   robotWeaponEnergy = weaponEnergy,
-                   robotHealth = health,
-                   robotScore = robotScore robot - 1 }
-  
+  in (Robot { robotIndex = index,
+             robotExpr = program,
+             robotData = RobotNull,
+             robotLocation = (locationX', locationY'),
+             robotLocationDelta = (locationDeltaX, locationDeltaY),
+             robotRotation = rotation,
+             robotRotationDelta = rotationDelta,
+             robotGeneralEnergy = generalEnergy,
+             robotWeaponEnergy = weaponEnergy,
+             robotHealth = health,
+             robotScore = score },
+       gen''''''''')
+
 -- | Update robots for kills.
 updateRobotForKills :: Seq.Seq Int -> Robot -> Robot
 updateRobotForKills kills robot =
@@ -283,7 +295,7 @@ applyDeltaVectorFriction vector friction =
 -- | Execute a robot cycle.
 robotCycle :: Robot -> State.State RobotWorld (RobotValue, RobotAction)
 robotCycle robot = do
-  world <- get
+  world <- State.get
   let locationDeltaAbs = vectorAbs . robotLocationDelta $ robot
       locationDeltaAngle = vectorAngle . robotLocationDelta $ robot
       locationDeltaAngle' =

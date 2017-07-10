@@ -50,9 +50,6 @@ import Data.Foldable (foldlM,
 import Data.Bits (xor)
 import Data.Text as Text
 
--- | Intrinsic entry type
-data RobotConstEntry = RobotConstEntry RobotValue Text.Text
-
 -- | Constants
 consts :: Seq.Seq RobotValue
 consts = map (\RobotConstEntry value _ -> value) (specialValues >< intrinsics)

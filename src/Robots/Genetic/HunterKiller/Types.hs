@@ -34,6 +34,7 @@ module Robots.Genetic.HunterKiller.Types
   (RobotWorld (..),
    RobotMutate (..),
    RobotParams (..),
+   RobotConstEntry (..),
    RobotState (..),
    Robot (..),
    RobotVM (..),
@@ -41,13 +42,24 @@ module Robots.Genetic.HunterKiller.Types
    RobotIntrinsicFunc,
    RobotExpr (..),
    RobotContext (..),
-   RobotAction (..))
+   RobotAction (..),
+   RobotEvent (..),
+   RobotInput (..),
+   RobotCycleState (..))
   
 where
 
 import Data.Sequence as Seq
 import Control.Monad.State.Strict as State
 import System.Random as Random
+
+-- | Robot continuity type
+data RobotCont m =
+  RobotCont { robotContParams :: RobotParams,
+              robotContRandom :: Random.StdGen,
+              robotContPrograms :: Seq.Seq RobotExpr,
+              robotCondEventHandler :: RobotEvent -> m RobotInput }
+  deriving (Eq)
 
 -- | Robot world type
 data RobotWorld =
@@ -64,6 +76,7 @@ data RobotWorld =
 data RobotMutate =
   RobotMutate { robotMutateParams :: RobotParams,
                 robotMutateRandom :: Random.StdGen }
+  deriving (Eq)
 
 -- | Robot parameters
 data RobotParams =
@@ -120,9 +133,14 @@ data RobotParams =
                 robotParamsRandomCondWeight :: Double,
                 robotParamsRandomApplySpecialWeight :: Double,
                 robotParamsRandomMaxDepth :: Int,
+                robotParamsReproduction :: Seq.Seq Int,
                 robotParamsSpecialConsts :: Seq.Seq RobotValue,
                 robotParamsSpecialValueCount :: Int }
   deriving (Eq)
+
+-- | Intrinsic entry type
+data RobotConstEntry = RobotConstEntry RobotValue Text.Text
+                     deriving (Eq)
 
 -- | Robot state
 data RobotState =
@@ -152,6 +170,7 @@ data Shot =
          shotLocationDelta :: (Double, Double),
          shotEnergy :: Double,
          shotRobotIndex :: Int }
+  deriving (Eq)
 
 -- | Robot value type
 data RobotValue = RobotNull
@@ -188,3 +207,19 @@ data RobotAction =
                 robotActionThrustPower :: Double,
                 robotActionTurnPower :: Double }
   deriving (Eq)
+
+-- | Robot event
+data RobotEvent = RobotNewRound RobotWorld
+                | RobotWorldCycle RobotWorld
+                | RobotRoundDone RobotWorld
+                deriving (Eq)
+
+-- | Robot input
+data RobotInput = RobotContinue
+                | RobotExit
+                deriving (Eq)
+
+-- | Robot cycle state
+data RobotCycleState = RobotNextCycle
+                     | RobotEndRound
+                     deriving (Eq)

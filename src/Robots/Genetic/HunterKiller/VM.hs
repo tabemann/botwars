@@ -49,10 +49,10 @@ import Control.Monad (mapM,
 -- | Execute an instruction.
 execute :: RobotContext -> RobotExpr -> State.State RobotState RobotValue
 execute (RobotContext context) expr = do
-  depth <- robotStateDepth =<< get
-  instrCount <- robotStateInstrCount =<< get
-  maxDepth <- robotParamsMaxDepth . robotStateParams =<< get
-  maxInstrCount <- robotParamsMaxInstrCount . robotStateParams =<< get
+  depth <- robotStateDepth <$> State.get
+  instrCount <- robotStateInstrCount <$> State.get
+  maxDepth <- robotParamsMaxDepth . robotStateParams <$> State.get
+  maxInstrCount <- robotParamsMaxInstrCount . robotStateParams <$> State.get
   if (depth <= maxDepth) && (instrCount <= maxInstrCount)
     then
       case expr of
@@ -99,8 +99,8 @@ executeArgExprs :: RobotContext -> Seq.Seq RobotExpr ->
                    State.State RobotState (Seq.Seq RobotValue)
 executeArgExprs context exprs =
   mapM (\expr -> do
-           instrCount <- robotStateInstrCount =<< get
-           maxInstrCount <- robotParamsMaxInstrCount . robotStateParams =<< get
+           instrCount <- robotStateInstrCount <$> State.get
+           maxInstrCount <- robotParamsMaxInstrCount . robotStateParams <$> State.get
            if instrCount <= maxInstrCount
              then do updateStateInto
                      execute context expr

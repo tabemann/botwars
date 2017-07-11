@@ -36,39 +36,43 @@ module Robots.Genetic.HunterKiller.Load
 where
 
 import Robots.Genetic.HunterKiller.Types
+import Robots.Genetic.HunterKiller.World
 import Data.Text as Text
 import Data.Attoparsec.Text as Atto
 import Data.Sequence as Seq
 import Data.Sequence ((<|))
+import Data.Either (isLeft)
 import Data.Functor ((<$>))
-import Control.Applicative as Appl
 import Control.Applicative ((<*>),
                             (*>),
                             (<*),
                             (<|>))
-import Data.Char as Char
+import Data.Char (isSpace)
 
 -- | Load a robot program from text.
-load :: Seq.Seq RobotConstEntry -> Text.Text -> RobotExpr
+load :: Seq.Seq RobotConstEntry -> Text.Text -> Either Text.Text RobotExpr
+load consts text =
+  case Atto.parseOnly (parseExpr consts) text of
+    Right expr -> verifyExpr startingContextDepth expr
+    Left errorMessage -> Left . Text.pack $ errorMessage
 
 -- | Parse an expression.
-parseExpr :: Int -> Seq.Seq RobotConstEntry ->
-             Atto.Parser (Either Text.Text RobotExpr)
+parseExpr :: Seq.Seq RobotConstEntry -> Atto.Parser (Either Text.Text RobotExpr)
 parseExpr consts =
-  parseLoad <|>
-  parseConst <|>
-  parseSpecialConst consts <|>
-  parseBind consts <|>
-  parseFunc consts <|>
-  parseApply consts <|>
-  parseCond consts
+  Atto.choice [parseLoad,
+               parseConst,
+               parseSpecialConst consts,
+               parseBind consts,
+               parseFunc consts,
+               parseApply consts,
+               parseCond consts]
 
 -- | Parse a load expression.
 parseLoad :: Atto.Parser RobotExpr
 parseLoad =
   RobotLoad <$> (Atto.skipSpace *>
                  "load" *>
-                 Atto.takeWhile1 Char.isSpace *>
+                 Atto.takeWhile1 isSpace *>
                  Atto.decimal <*
                  Atto.skipSpace)
 
@@ -77,7 +81,7 @@ parseConst :: Atto.Parser RobotExpr
 parseConst =
   RobotConst <$> (Atto.skipSpace *>
                   "const" *>
-                  Atto.takeWhile1 Char.isSpace *>
+                  Atto.takeWhile1 isSpace *>
                   parseValue <*
                   Atto.skipSpace)
 
@@ -219,12 +223,12 @@ parseValue =
                                   Atto.skipSpace)) <|>
   (RobotInt <$> (Atto.skipSpace *>
                  "int" *>
-                 Atto.takeWhile1 Char.isSpace *>
+                 Atto.takeWhile1 isSpace *>
                  Atto.signed Atto.decimal <*
                  Atto.skipSpace)) <|>
   (RobotFloat <$> (Atto.skipSpace *>
                    "float" *>
-                   Atto.takeWhile1 Char.isSpace *>
+                   Atto.takeWhile1 isSpace *>
                    Atto.double <*
                    Atto.skipSpace)) <|>
   ((RobotVector . Seq.fromList) <$>
@@ -241,3 +245,52 @@ parseValue =
      
     Atto.skipSpace <*
     "]"))
+
+-- | Verify an expression.
+verifyExpr :: Int -> RobotExpr -> Either Text.Text RobotExpr
+verifyExpr contextDepth (RobotLoad index)@expr =
+  if (index >= 0) && (index < contextDepth)
+  then Right expr
+  else Left "invalid load index"
+verifyExpr _ (RobotConst _)@expr = Right expr
+verifyExpr _ (RobotSpecialConst index)@expr =
+  if index >= 0
+  then Right expr
+  else Left "unknown special constant"
+verifyExpr contextDepth (RobotBind boundExprs expr')@expr =
+  let boundExprs' =
+        fmap (verifyExpr $ contextDepth + Seq.length boundExprs) boundExprs
+  in case Seq.elemIndexL isLeft boundExprs' of
+       Just index ->
+         case Seq.lookup index boundExprs' of
+           Just exprError -> exprError
+           Nothing -> error "could not find index"
+       Nothing ->
+         case verifyExpr (contextDepth + Seq.length boundExprs) expr' of
+           Right _ -> Right expr
+           exprError -> exprError
+verifyExpr contextDepth (RobotFunc argCount expr')@expr =
+  case verifyExpr (contextDepth + argCount) expr' of
+    Right _ -> Right expr
+    exprError -> exprError
+verifyExpr contextDepth (RobotApply argExprs funcExpr)@expr =
+  let argExprs' = fmap (verifyExpr contextDepth) argExprs
+  in case Seq.elemIndexL isLeft argExprs' of
+       Just index ->
+         case Seq.lookup index argExprs' of
+           Just exprError -> exprError
+           Nothing -> error "could not find index"
+       Nothing ->
+         case verifyExpr contextDepth funcExpr of
+           Right _ -> Right expr
+           exprError -> exprError
+verifyExpr contextDepth (RobotCond condExpr trueExpr falseExpr)@expr =
+  case verifyExpr contextDepth condExpr of
+    Right _ ->
+      case verifyExpr contextDepth trueExpr of
+        Right _ ->
+          case verifyExpr contextDepth falseExpr of
+            Right _ -> Right expr
+            exprError -> exprError
+        exprError -> exprError
+    exprError -> exprError

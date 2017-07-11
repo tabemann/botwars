@@ -32,7 +32,8 @@
 module Robots.Genetic.HunterKiller.World
 
   (worldCycle,
-   generateRobot)
+   generateRobot,
+   startingContextDepth)
   
 where
 
@@ -291,6 +292,10 @@ applyDeltaVectorFriction vector friction =
        Just angle -> (cos angle * distance * friction,
                       sin angle * distance * friction)
        Nothing -> (0.0, 0.0)
+
+-- | Starting context depth.
+startingContextDepth :: Int
+startingContextDepth = 9
 
 -- | Execute a robot cycle.
 robotCycle :: Robot -> State.State RobotWorld (RobotValue, RobotAction)

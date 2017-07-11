@@ -70,7 +70,7 @@ combat' count =
     case Seq.lookup 0 programs of
       Just program ->
         let (newProgram, mutateState) =
-              State.runState (mutate 0 program)
+              State.runState (mutate startingContextDepth program)
                 (RobotMutate { robotMutateRandom = gen,
                                robotMutateParams = params })
         in do state $ \cont -> cont { randomContRandom =
@@ -138,7 +138,7 @@ reproduce :: RobotParams -> (Seq.Seq RobotExpr, Random.StdGen) ->
 reproduce params (programs, gen) (program, count) =
   if count > 0
   then let (newProgram, mutateState) =
-             State.runState (mutate 0 program)
+             State.runState (mutate startingContextDepth program)
                (RobotMutate { robotMutateRandom = gen,
                               robotMutateParams = params })
        in reproduce params

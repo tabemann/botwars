@@ -38,19 +38,21 @@ module Robots.Genetic.HunterKiller.World
 where
 
 import Robots.Genetic.HunterKiller.Types
+import Robots.Genetic.HunterKiller.Utility
 import Robots.Genetic.HunterKiller.VM
-import Data.Sequence as Seq
+import qualified Data.Sequence as Seq
 import Data.Sequence ((|>),
                       (><))
-import Control.Monad.State.Strict as State
+import qualified Control.Monad.State.Strict as State
 import Data.Functor (fmap,
                      (<$>))
 import Control.Monad (mapM,
                       mapM_,
+                      foldM,
                       (=<<))
 import Data.Foldable (Foldable,
                       foldl')
-import System.Random as Random
+import qualified System.Random as Random
 
 -- | Execute a world cycle.
 worldCycle :: State.State RobotWorld RobotCycleState
@@ -84,14 +86,14 @@ collideRobotsAndShots robots shots = do
   (robots, shots, kills) <-
     foldM (\(robots, shots, kills) robot -> do
               (robot, shots, robotKills) <-
-                collideRobotWitShots robot shots
+                collideRobotWithShots robot shots
               return $ (robots |> robot, shots, kills >< robotKills))
-    (Seq.empty, shots, Seq.empty)
+    (Seq.empty, shots, Seq.empty) robots
   let robots' = fmap (updateRobotForKills kills) robots
-  state (\world -> world { robotWorldRobots = robots',
-                           robotWorldShots = shots,
-                           robotWorldKills = robotWorldKills world +
-                                             Seq.length kills })
+  State.state (\world -> ((), world { robotWorldRobots = robots',
+                                      robotWorldShots = shots,
+                                      robotWorldKills = robotWorldKills world +
+                                                        Seq.length kills }))
 
 -- | Collide robots with shots.
 collideRobotWithShots :: Robot -> Seq.Seq Shot ->
@@ -131,7 +133,7 @@ collideRobotWithShots robot shots = do
                    Seq.empty)
     else do
       robot <- respawnRobot robot
-      return (robot, shotThatDidNotHit, fmap shotRobotIndex shotsThatHit)
+      return (robot, shotsThatDidNotHit, fmap shotRobotIndex shotsThatHit)
 
 -- | Respawn a robot
 respawnRobot :: Robot -> State.State RobotWorld Robot
@@ -148,7 +150,7 @@ respawnRobot robot = do
   return robot
 
 -- | Generate a robot.
-generateRobot :: Int -> RobotExpr -> Int -> RobotParams -> Random.StdGen ->
+generateRobot :: Int -> RobotExpr -> Int -> Random.StdGen -> RobotParams ->
                  (Robot, Random.StdGen)
 generateRobot index program score gen params = 
   let (generalEnergy, gen') =
@@ -196,14 +198,6 @@ updateRobotForKills kills robot =
                          else robot)
     robot kills
 
--- | Collect Just entries from a sequence into a new sequence
-collectJust :: Foldable t => t (Maybe a) -> Seq.Seq a
-collectJust items = foldl' (\entries entry ->
-                               case entry of
-                                 Just entry -> entries |> entry
-                                 Nothing -> entries)
-                    Seq.empty items
-
 -- | Update a robot.
 updateRobot :: Robot -> RobotValue -> RobotAction -> RobotParams ->
   (Robot, Maybe Shot)
@@ -218,7 +212,7 @@ updateRobot robot stateData action params =
         applyDeltaVectorFriction (robotLocationDelta robot)
           (robotParamsLocationFriction params)
       rotationDelta =
-        robotRotationDelta robot * robotParamsRotationFriction params
+        robotRotationDelta robot * (1.0 - robotParamsRotationFriction params)
       turnValue = robotActionTurnPower action
       turnPower = min generalEnergy (abs turnValue)
       generalEnergy' = generalEnergy - turnPower
@@ -244,7 +238,7 @@ updateRobot robot stateData action params =
                        robotRotationDelta = rotationDelta',
                        robotGeneralEnergy = generalEnergy'',
                        robotWeaponEnergy = weaponEnergy',
-                       robotHealth = health },
+                       robotHealth = health }
       shot = if firePower > 0.0
              then Just $ fireShot robot' firePower params
              else Nothing
@@ -272,26 +266,12 @@ fireShot robot power params =
 -- | Update a shot.
 updateShot :: Shot -> RobotParams -> Maybe Shot
 updateShot shot params =
-  let energy = shotEnergy shot * robotParamsShotEnergyDecay params
+  let energy = shotEnergy shot * (1.0 - robotParamsShotEnergyDecay params)
       location =
         wrap  $ addVector (shotLocation shot) (shotLocationDelta shot)
   in if energy >= robotParamsShotMinEnergy params
      then Just $ shot { shotEnergy = energy, shotLocation = location }
      else Nothing
-
--- | Get the sign of a number.
-sign :: Double -> Double
-sign n = if n > 0.0 then 1.0 else if n < 0.0 then -1.0 else 0.0
-
--- | Apply frication two location delta.
-applyDeltaVectorFriction :: (Double, Double) -> Double -> (Double, Double)
-applyDeltaVectorFriction vector friction =
-  let distance = vectorAbs vector
-      angle = vectorAngle vector
-  in case angle of
-       Just angle -> (cos angle * distance * friction,
-                      sin angle * distance * friction)
-       Nothing -> (0.0, 0.0)
 
 -- | Starting context depth.
 startingContextDepth :: Int
@@ -301,7 +281,7 @@ startingContextDepth = 9
 robotCycle :: Robot -> State.State RobotWorld (RobotValue, RobotAction)
 robotCycle robot = do
   world <- State.get
-  let locationDeltaAbs = vectorAbs . robotLocationDelta $ robot
+  let locationDeltaAbs = absVector . robotLocationDelta $ robot
       locationDeltaAngle = vectorAngle . robotLocationDelta $ robot
       locationDeltaAngle' =
         case locationDeltaAngle of
@@ -328,7 +308,7 @@ robotCycle robot = do
     State.evalState (execute (RobotContext input) (robotExpr robot))
       (RobotState { robotStateParams = robotWorldParams world,
                     robotStateDepth = 0,
-                    robotStateInstrCount })
+                    robotStateInstrCount = 0 })
 
 -- | Detect robots.
 detect :: Robot -> Seq.Seq ((Double, Double), (Double, Double)) ->
@@ -336,10 +316,10 @@ detect :: Robot -> Seq.Seq ((Double, Double), (Double, Double)) ->
 detect robot objects params =
   let location = robotLocation robot
       objectsWithInfo =
-        fmap (\(objectLocation, _) @ object ->
+        fmap (\object@(objectLocation, _) ->
                 let objectRelativeLocation =
                       wrap $ subVector objectLocation location
-                    objectDistance = vectorAbs objectRelativeLocation
+                    objectDistance = absVector objectRelativeLocation
                     objectAngle = vectorAngle objectRelativeLocation
                     objectAngle' =
                       case objectAngle of
@@ -368,24 +348,24 @@ detect robot objects params =
                    addVector objectLocation objectLocationDelta
                  objectRelativeNewLocation =
                    wrap $ subVector objectNewLocation location
-                 objectNewDistance = vectorAbs objectRelativeNewLocation
-                 objectNewAngle = vectorAngle objectNewDistance
+                 objectNewDistance = absVector objectRelativeNewLocation
+                 objectNewAngle = vectorAngle objectRelativeNewLocation
                  objectNewAngle' =
                    case objectNewAngle of
                      Just objectNewAngle ->
                        normalizeAngle $ objectNewAngle - robotRotation robot
                      Nothing -> 0.0
                  objectDistanceDelta = objectNewDistance - distance
-                 objectAngleDelta = normalizeAngle $ objectNewAngle - angle
-             RobotVector . fromList $
-               [RobotFloat distance,
-                RobotFloat angle,
-                RobotFloat objectDistanceDelta,
-                RobotFloat objectNewDelta])
+                 objectAngleDelta = normalizeAngle $ objectNewAngle'- angle
+             in RobotVector . Seq.fromList $
+                  [RobotFloat distance,
+                   RobotFloat angle,
+                   RobotFloat objectDistanceDelta,
+                   RobotFloat objectAngleDelta])
           sortedObjects'
 
 -- | Calculate a view score based on distance and angle.
-viewScore :: Double -> Double -> RobotParams
+viewScore :: Double -> Double -> RobotParams -> Double
 viewScore distance angle params =
   ((robotParamsViewSortDistanceFactor params) * distance) +
   ((robotParamsViewSortAngleFactor params) * (abs angle))
@@ -396,64 +376,3 @@ extractOutput (RobotOutput value action) = (value, action)
 extractOutput value = (value, RobotAction { robotActionFirePower = 0.0,
                                             robotActionThrustPower = 0.0,
                                             robotActionTurnPower = 0.0 })
-
--- | Add two vectors.
-addVector :: (Double, Double) -> (Double, Double) -> (Double, Double)
-addVector (x0, y0) (x1, y1) = (x0 + x1, y0 + y1)
-
--- | Subtract two vectors.
-subVector :: (Double, Double) -> (Double, Double) -> (Double, Double)
-subVector (x0, y0) (x1, y1) = (x0 - x1, y0 - y1)
-
--- | Wrap coordinate.
-wrap :: (Double, Double) -> (Double, Double)
-wrap (x, y) = (wrapDim x, wrapDim y)
-
--- | Wrap a single dimension
-wrapDim :: Double -> Double
-wrapDim x =
-  let x' = (modDouble (x + 0.5) 1.0) - 0.5
-  in if x' != (-0.5) then x' else 0.5
-
--- | Absolute value of a vector function
-vectorAbs :: (Double, Double) -> Double
-vectorAbs (x, y) = sqrt ((x ** 2.0) + (y ** 2.0))
-
--- | Angle of vector function function
-vectorAngle :: (Double, Double) -> Maybe Double
-vectorAngle (x, y) =
-  if x > 0.0
-  then Just . atan $ y / x
-  else if (x < 0.0) && (y >= 0.0)
-  then Just $ (atan $ y / x) + pi
-  else if (x < 0.0) && (y < 0.0)
-  then Just $ (atan $ y / x) - pi
-  else if (x == 0.0) && (y > 0.0)
-  then Just $ pi / 2.0
-  else if (x == 0.0) && (y < 0.0)
-  then Just $ -(pi / 2.0)
-  else Nothing
-
--- | Angle normalization functon
-normalizeAngle :: Double -> Double
-normalizeAngle angle =
-  if angle > 0.0
-  then normalizeAngleCore angle
-  else if angle < 0.0
-  then let angle' = -(normalizeAngleCore (-angle))
-       in if angle' > (-pi)
-          then angle'
-          else pi
-  else 0.0
-
--- | Core of angle normalization
-normalizeAngleCore :: Double -> Double
-normalizeAngleCore angle =
-  let limited = modDouble angle (pi * 2.0)
-  in if limited <= pi
-     then limited
-     else (-pi) + (limited - pi)
-
--- | Floating point modulus
-modDouble :: Double -> Double -> Double
-modDouble x y = x - ((fromIntegral (floor (x / y))) * y)

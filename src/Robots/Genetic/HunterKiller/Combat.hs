@@ -39,7 +39,8 @@ import Robots.Genetic.HunterKiller.Mutate
 import Control.Monad.State.Strict as State
 import Data.Sequence as Seq
 import Data.Sequence ((|>))
-import Data.Functor ((<$>))
+import Data.Functor ((<$>),
+                     fmap)
 import System.Random as Random
 import Control.Monad.IO.Class as MonadIO
 import Control.Monad.Trans.Class (MonadTrans,
@@ -48,38 +49,14 @@ import Data.Foldable (foldlM,
                       foldl')
 
 -- | Execute robot combat.
-combat :: Monad m => (RobotEvent -> m ()) -> RobotExpr -> Int -> RobotParams -> 
-          Random.StdGen -> m Random.StdGen
-combat func program count params gen =
-  if count >= 1
-  then robotContRandom <$> State.execStateT (combat' (count - 1))
-         (RobotCont { robotContParams = params,
-                      robotContRandom = gen,
-                      robotContPrograms = Seq.singleton program,
-                      robotContEventHandler = func })
-  else error "count smaller than 1"
-  
--- | Actually set up and execute robot combat.
-combat' :: Monad m => Int -> State.StateT (RobotCont m) m ()
-combat' count =
-  if count > 0
-  then do
-    programs <- robotContPrograms <$> State.get
-    gen <- robotContRandom <$> State.get
-    params <- randomContParams <$> State.get
-    case Seq.lookup 0 programs of
-      Just program ->
-        let (newProgram, mutateState) =
-              State.runState (mutate startingContextDepth program)
-                (RobotMutate { robotMutateRandom = gen,
-                               robotMutateParams = params })
-        in do state $ \cont -> cont { randomContRandom =
-                                        robotMutateRandom mutateState,
-                                      randomContPrograms =
-                                        randomContPrograms cont |> newProgram }
-              combat' $ count - 1
-      Nothing -> error "no programs available"
-  else executeRounds
+combat :: Monad m => (RobotEvent -> m RobotInput) -> Seq.Seq RobotExpr ->
+          RobotParams -> Random.StdGen -> m Random.StdGen
+combat func programs params gen =
+  robotContRandom <$> State.execStateT executeRounds
+    (RobotCont { robotContParams = params,
+                 robotContRandom = gen,
+                 robotContPrograms = programs,
+                 robotContEventHandler = func })
 
 -- | Execute rounds of combat.
 executeRounds :: Monad m => State.StateT (RobotCont m) m ()
@@ -88,7 +65,7 @@ executeRounds = do
   eventHandler <- robotContEventHandler <$> State.get
   input <- lift . eventHandler $ RobotNewRound world
   case input of
-    RobotContinue ->
+    RobotContinue -> do
       (input, world') <- executeCycles world
       case input of
         RobotContinue -> do
@@ -105,7 +82,7 @@ executeRounds = do
 executeCycles :: Monad m => RobotWorld ->
                  State.StateT (RobotCont m) m (RobotInput, RobotWorld)
 executeCycles world = do
-  eventHandler <- robotContEventHandler
+  eventHandler <- robotContEventHandler <$> State.get
   input <- lift . eventHandler $ RobotWorldCycle world
   case input of
     RobotContinue ->
@@ -116,15 +93,15 @@ executeCycles world = do
     RobotExit -> return (RobotExit, world)
 
 -- | Prepare the next round.
-prepareNextRound :: RobotWorld -> State.StateT (RobotCont m) m ()
+prepareNextRound :: Monad m => RobotWorld -> State.StateT (RobotCont m) m ()
 prepareNextRound world = do
   params <- robotContParams <$> State.get
   let reproduction = robotParamsReproduction params
       sortedRobots = Seq.sortBy (\robot0 robot1 -> compare (robotScore robot1)
                                   (robotScore robot0)) (robotWorldRobots world)
-      totalNew = foldl' (+) reproduction
+      totalNew = foldl' (+) 0 reproduction
       sortedRobots' = Seq.take (Seq.length sortedRobots - totalNew) sortedRobots
-      programs = foldl' robotExpr sortedRobots
+      programs = fmap robotExpr sortedRobots'
       (programs', gen) = foldl' (reproduce params)
                            (programs, robotWorldRandom world)
                            (Seq.zip programs reproduction)
@@ -147,7 +124,7 @@ reproduce params (programs, gen) (program, count) =
   else (programs, gen)
 
 -- | Set up a world.
-setupWorld :: State.StateT (RobotCont m) m RobotWorld
+setupWorld :: Monad m => State.StateT (RobotCont m) m RobotWorld
 setupWorld = do
   params <- robotContParams <$> State.get
   programs <- robotContPrograms <$> State.get
@@ -165,7 +142,7 @@ setupWorld = do
                         robotWorldRandom = gen }
 
 -- | Set up a robot.
-setupRobot :: RobotExpr -> Int -> State.StateT (RobotCont m) m Robot
+setupRobot :: Monad m => RobotExpr -> Int -> State.StateT (RobotCont m) m Robot
 setupRobot program index = do
   params <- robotContParams <$> State.get
   gen <- robotContRandom <$> State.get
@@ -174,15 +151,16 @@ setupRobot program index = do
   return robot
   
 -- | Get a random value in [0, 1)
-random :: Random.Random a => State.StateT (RobotCont m) m a
+random :: (Monad m, Random.Random a) => State.StateT (RobotCont m) m a
 random = do
   (value, gen) <- Random.random <$> robotContRandom <$> State.get
-  state $ \contState -> contState { robotContRandom = gen }
+  state $ \contState -> ((), contState { robotContRandom = gen })
   return value
 
 -- | Get a random value in [a, b]
-randomR :: Random.Random a => (a, a) -> State.StateT (RobotCont m) m a
+randomR :: (Monad m, Random.Random a) => (a, a) ->
+           State.StateT (RobotCont m) m a
 randomR range = do
   (value, gen) <- Random.randomR range <$> robotContRandom <$> State.get
-  state $ \contState -> contState { robotContRandom = gen }
+  state $ \contState -> ((), contState { robotContRandom = gen })
   return value

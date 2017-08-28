@@ -31,28 +31,37 @@
 
 module Robots.Genetic.HunterKiller.Intrinsics
 
-  (intrinsics)
+  (specialConsts,
+   specialValueCount,
+   specialConstEntries)
 
 where
 
 import Robots.Genetic.HunterKiller.Types
 import Robots.Genetic.HunterKiller.VM
-import Control.Monad.State.Strict as State
-import Data.Sequence as Seq
+import qualified Control.Monad.State.Strict as State
+import qualified Data.Sequence as Seq
 import Data.Sequence ((><),
                       (<|),
                       (|>),
-                      (:<),
-                      (:>))
+                      ViewL(..),
+                      ViewR(..))
 import Control.Monad (mapM)
 import Data.Foldable (foldlM,
                       foldrM)
 import Data.Bits (xor)
-import Data.Text as Text
+import qualified Data.Text as Text
+import Data.Functor (fmap)
 
 -- | Constants
-consts :: Seq.Seq RobotValue
-consts = map (\RobotConstEntry value _ -> value) (specialValues >< intrinsics)
+specialConsts :: Seq.Seq RobotValue
+specialConsts = fmap (\(RobotConstEntry value _) -> value) specialConstEntries
+
+-- | Special value count
+specialValueCount = Seq.length specialValues
+
+-- | Special constants
+specialConstEntries = specialValues >< intrinsics
 
 -- | Special values
 specialValues :: Seq.Seq RobotConstEntry
@@ -127,7 +136,7 @@ intrinsicEquals :: Seq.Seq RobotValue -> State.State RobotState RobotValue
 intrinsicEquals args = do
   updateStateFinish
   case (Seq.lookup 0 args, Seq.lookup 1 args) of
-    (Just x, Just y) -> return . RobotBool $ x == y
+    (Just x, Just y) -> return . RobotBool $ valueEqual x y
     _ -> return . RobotBool $ False
 
 -- | The not equals intrinsic
@@ -135,8 +144,44 @@ intrinsicNotEquals :: Seq.Seq RobotValue -> State.State RobotState RobotValue
 intrinsicNotEquals args = do
   updateStateFinish
   case (Seq.lookup 0 args, Seq.lookup 1 args) of
-    (Just x, Just y) -> return . RobotBool $ x /= y
+    (Just x, Just y) -> return . RobotBool $ valueNotEqual x y
     _ -> return . RobotBool $ True
+
+-- | Get whether two values are equal
+valueEqual :: RobotValue -> RobotValue -> Bool
+valueEqual RobotNull RobotNull = True
+valueEqual (RobotBool x) (RobotBool y) = x == y
+valueEqual (RobotInt x) (RobotInt y) = x == y
+valueEqual (RobotFloat x) (RobotFloat y) = x == y
+valueEqual (RobotInt x) (RobotFloat y) = fromIntegral x == y
+valueEqual (RobotFloat x) (RobotInt y) = x == fromIntegral y
+valueEqual (RobotVector x) (RobotVector y) =
+  if Seq.length x == Seq.length y
+  then
+    case Seq.elemIndexL False
+         (fmap (\(x, y) -> valueEqual x y) (Seq.zip x y)) of
+      Just _ -> False
+      Nothing -> True
+  else False
+valueEqual _ _ = False
+
+-- | Get whether two values are not equal
+valueNotEqual :: RobotValue -> RobotValue -> Bool
+valueNotEqual RobotNull RobotNull = False
+valueNotEqual (RobotBool x) (RobotBool y) = x /= y
+valueNotEqual (RobotInt x) (RobotInt y) = x /= y
+valueNotEqual (RobotFloat x) (RobotFloat y) = x /= y
+valueNotEqual (RobotInt x) (RobotFloat y) = fromIntegral x /= y
+valueNotEqual (RobotFloat x) (RobotInt y) = x /= fromIntegral y
+valueNotEqual (RobotVector x) (RobotVector y) =
+  if Seq.length x == Seq.length y
+  then
+    case Seq.elemIndexL True
+         (fmap (\(x, y) -> valueNotEqual x y) (Seq.zip x y)) of
+      Just _ -> True
+      Nothing -> False
+  else True
+valueNotEqual _ _ = True
 
 -- | The vector get intrinsic
 intrinsicGet :: Seq.Seq RobotValue -> State.State RobotState RobotValue
@@ -198,8 +243,8 @@ intrinsicLength args = do
   updateStateFinish
   case Seq.lookup 0 args of
     Just (RobotVector value) ->
-      return . RobotInteger . fromIntegral $ Seq.length value
-    _ -> return . RobotInteger $ 0
+      return . RobotInt . fromIntegral $ Seq.length value
+    _ -> return . RobotInt $ 0
 
 -- | The vector left head intrinsic
 intrinsicLHead :: Seq.Seq RobotValue -> State.State RobotState RobotValue
@@ -229,7 +274,7 @@ intrinsicRHead args = do
   updateStateFinish
   case Seq.lookup 0 args of
     Just (RobotVector value) ->
-      case Seq.viewl value of
+      case Seq.viewr value of
         _ :> headValue -> return headValue
         _ -> return RobotNull
     _ -> return RobotNull
@@ -240,7 +285,7 @@ intrinsicRTail args = do
   updateStateFinish
   case Seq.lookup 0 args of
     Just (RobotVector value) ->
-      case Seq.viewl value of
+      case Seq.viewr value of
         vector :> _ -> return . RobotVector $ vector
         _ -> return . RobotVector $ Seq.empty
     _ -> return . RobotVector $ Seq.empty
@@ -252,7 +297,7 @@ intrinsicMap args = do
     (Just func, Just (RobotVector vector)) -> do
       vector' <- mapM (\value -> apply (Seq.singleton value) func) vector
       updateStateFinish
-      return vector'
+      return . RobotVector $ vector'
     _ -> do updateStateFinish
             return . RobotVector $ Seq.empty
 
@@ -307,7 +352,7 @@ intrinsicOr args = do
   return . RobotBool $
     case (Seq.lookup 0 args, Seq.lookup 1 args) of
       (Just value0, Just value1) -> castToBool value0 || castToBool value1
-      _ -> return . RobotBool $ True
+      _ -> True
 
 -- | The xor intrinsic
 intrinsicXor :: Seq.Seq RobotValue -> State.State RobotState RobotValue
@@ -373,8 +418,8 @@ intrinsicFire args = do
           RobotOutput value action ->
             RobotOutput value
               (action { robotActionFirePower =
-                        robotActionFirePower + castToDouble power })
-          value -
+                        robotActionFirePower action + castToDouble power })
+          value ->
             RobotOutput value
               (RobotAction { robotActionFirePower = castToDouble power,
                              robotActionThrustPower = 0.0,
@@ -393,8 +438,8 @@ intrinsicThrust args = do
           RobotOutput value action ->
             RobotOutput value
               (action { robotActionThrustPower =
-                        robotActionThrustPower + castToDouble power })
-          value -
+                        robotActionThrustPower action + castToDouble power })
+          value ->
             RobotOutput value
               (RobotAction { robotActionFirePower = 0.0,
                              robotActionThrustPower = castToDouble power,
@@ -413,8 +458,8 @@ intrinsicTurn args = do
           RobotOutput value action ->
             RobotOutput value
               (action { robotActionTurnPower =
-                        robotActionTurnPower + castToDouble power })
-          value -
+                        robotActionTurnPower action + castToDouble power })
+          value ->
             RobotOutput value
               (RobotAction { robotActionFirePower = 0.0,
                              robotActionThrustPower = 0.0,
@@ -432,8 +477,8 @@ intrinsicAdd args = do
     (Just value0, Just (RobotFloat value1)) ->
       return . RobotFloat $ castToDouble value0 + value1
     (Just value0, Just value1) ->
-      return . RobotInteger $ castToInteger value0 + castToInteger value1
-    _ -> return . RobotInteger $ 0
+      return . RobotInt $ castToInteger value0 + castToInteger value1
+    _ -> return . RobotInt $ 0
 
 -- | The subtract intrinsic
 intrinsicSub :: Seq.Seq RobotValue -> State.State RobotState RobotValue
@@ -445,8 +490,8 @@ intrinsicSub args = do
     (Just value0, Just (RobotFloat value1)) ->
       return . RobotFloat $ castToDouble value0 - value1
     (Just value0, Just value1) ->
-      return . RobotInteger $ castToInteger value0 - castToInteger value1
-    _ -> return . RobotInteger $ 0
+      return . RobotInt $ castToInteger value0 - castToInteger value1
+    _ -> return . RobotInt $ 0
 
 -- | The multiply intrinsic
 intrinsicMul :: Seq.Seq RobotValue -> State.State RobotState RobotValue
@@ -458,8 +503,8 @@ intrinsicMul args = do
     (Just value0, Just (RobotFloat value1)) ->
       return . RobotFloat $ castToDouble value0 * value1
     (Just value0, Just value1) ->
-      return . RobotInteger $ castToInteger value0 * castToInteger value1
-    _ -> return . RobotInteger $ 1
+      return . RobotInt $ castToInteger value0 * castToInteger value1
+    _ -> return . RobotInt $ 1
 
 -- | The divide intrinsic
 intrinsicDiv :: Seq.Seq RobotValue -> State.State RobotState RobotValue
@@ -467,16 +512,22 @@ intrinsicDiv args = do
   updateStateFinish
   case (Seq.lookup 0 args, Seq.lookup 1 args) of
     (Just (RobotFloat value0), Just value1) ->
-      return . RobotFloat $ value0 / castToDouble value1
+      if castToDouble value1 /= 0.0
+      then return . RobotFloat $ value0 / castToDouble value1
+      else return RobotNull
     (Just value0, Just (RobotFloat value1)) ->
-      return . RobotFloat $ castToDouble value0 / value1
+      if value1 /= 0.0
+      then return . RobotFloat $ castToDouble value0 / value1
+      else return RobotNull
     (Just value0, Just value1) ->
       let value0' = castToInteger value0
           value1' = castToInteger value1
-      in if (value0' `mod` value1') == 0
-         then return . RobotInteger $ value0' `div` value1'
-         else return . RobotFloat $ castToDouble value0 / castToDouble value1
-    _ -> return . RobotInteger $ 1
+      in if value1' /= 0
+         then if (value0' `mod` value1') == 0
+              then return . RobotInt $ value0' `div` value1'
+              else return . RobotFloat $ castToDouble value0 / castToDouble value1
+         else return RobotNull
+    _ -> return . RobotInt $ 1
 
 -- | The modulus intrinsic
 intrinsicMod :: Seq.Seq RobotValue -> State.State RobotState RobotValue
@@ -485,17 +536,23 @@ intrinsicMod args = do
   case (Seq.lookup 0 args, Seq.lookup 1 args) of
     (Just (RobotFloat value0), Just value1) ->
       let value1' = castToDouble value1
-      in let quotient = value0 / value1'
-      in return . RobotFloat $
-         value0 - ((fromIntegral $ floor quotient) * value1')
+      in if value1' /= 0.0
+         then let quotient = value0 / value1'
+              in return . RobotFloat $
+                 value0 - ((fromIntegral $ floor quotient) * value1')
+         else return RobotNull
     (Just value0, Just (RobotFloat value1)) ->
-      let value0' = castToDouble value0
-      in let quotient = value0' / value1
-      in return . RobotFloat $
-         value0' - ((fromIntegral $ floor quotient) * value1)
+      if value1 /= 0.0
+      then let value0' = castToDouble value0
+           in let quotient = value0' / value1
+              in return . RobotFloat $
+                 value0' - ((fromIntegral $ floor quotient) * value1)
+      else return RobotNull
     (Just value0, Just value1) ->
-      return . RobotInteger $ castToInteger value0 `mod` castToInteger value1
-    _ -> return . RobotInteger $ 0
+      if castToInteger value1 /= 0
+      then return . RobotInt $ castToInteger value0 `mod` castToInteger value1
+      else return RobotNull
+    _ -> return . RobotInt $ 0
 
 -- | The power intrinsic
 intrinsicPow :: Seq.Seq RobotValue -> State.State RobotState RobotValue
@@ -506,17 +563,17 @@ intrinsicPow args = do
       return . RobotFloat $ castToDouble value0 ** value1
     (Just (RobotFloat value0), Just value1) ->
       return . RobotFloat $ value0 ** castToDouble value1
-    (Just (RobotInteger value0), Just (RobotInteger value1)) ->
+    (Just (RobotInt value0), Just (RobotInt value1)) ->
       if value1 >= 0
-      then return . RobotInteger $ value0 ^ value1
+      then return . RobotInt $ value0 ^ value1
       else return . RobotFloat $ fromIntegral value0 ** fromIntegral value1
     (Just value0, Just value1) ->
       let value0' = castToInteger value0
           value1' = castToInteger value1
       in if value1' >= 0
-         then return . RobotInteger $ value0' ^ value1'
+         then return . RobotInt $ value0' ^ value1'
          else return . RobotFloat $ fromIntegral value0' ** fromIntegral value1'
-    _ -> return . RobotInteger $ 1
+    _ -> return . RobotInt $ 1
 
 -- | The sqrt intrinsic
 intrinsicSqrt :: Seq.Seq RobotValue -> State.State RobotState RobotValue
@@ -532,8 +589,8 @@ intrinsicAbs args = do
   updateStateFinish
   case Seq.lookup 0 args of
     Just (RobotFloat value) -> return . RobotFloat . abs $ value
-    Just value -> return . RobotInteger . abs . castToInteger $ value
-    _ -> return . RobotInteger $ 0
+    Just value -> return . RobotInt . abs . castToInteger $ value
+    _ -> return . RobotInt $ 0
 
 -- | The exp intrinsic
 intrinsicExp :: Seq.Seq RobotValue -> State.State RobotState RobotValue

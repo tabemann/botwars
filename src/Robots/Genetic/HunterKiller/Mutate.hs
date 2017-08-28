@@ -36,10 +36,10 @@ module Robots.Genetic.HunterKiller.Mutate
 where
 
 import Robots.Genetic.HunterKiller.Types
-import Data.Sequence as Seq
+import qualified Data.Sequence as Seq
 import Data.Sequence ((><))
-import Control.Monad.State.Strict as State
-import System.Random as Random
+import qualified Control.Monad.State.Strict as State
+import qualified System.Random as Random
 import Data.Functor ((<$>))
 import Control.Monad (mapM)
 
@@ -51,7 +51,7 @@ mutate contextDepth expr = do
   expr <- mutateSub contextDepth expr
   if mutateValue <= mutationChance
     then mutateDirect contextDepth expr
-    else expr
+    else return expr
 
 -- | Get a random value in [0, 1)
 random :: Random.Random a => State.State RobotMutate a
@@ -61,7 +61,7 @@ random = do
   return value
 
 -- | Get a random value in [a, b]
-randomR :: Random.Random a => (a, a) -> State.State RandomMutate a
+randomR :: Random.Random a => (a, a) -> State.State RobotMutate a
 randomR range = do
   (value, gen) <- Random.randomR range <$> robotMutateRandom <$> State.get
   State.modify $ \mutateState -> mutateState { robotMutateRandom = gen }
@@ -69,21 +69,21 @@ randomR range = do
 
 -- | Mutate a subexpression.
 mutateSub :: Int -> RobotExpr -> State.State RobotMutate RobotExpr
-mutateSub _ (RobotLoad _)@expr = return expr
-mutateSub _ (RobotConst _)@expr = return expr
-mutateSub _ (RobotSpecialConst _)@expr = return expr
+mutateSub _ expr@(RobotLoad _) = return expr
+mutateSub _ expr@(RobotConst _) = return expr
+mutateSub _ expr@(RobotSpecialConst _) = return expr
 mutateSub contextDepth (RobotBind boundExprs expr) = do
-  boundExprs <- mapM $ \boundExpr ->
-    mutate (contextDepth + Seq.length boundExprs) boundExpr
-  expr <- mutate (contextDepth + Seq.length boundExprs)
-  return $ RobotBind robotExprs expr
-mutateSub argCount expr = do
+  boundExprs <- mapM (\boundExpr ->
+    mutate (contextDepth + Seq.length boundExprs) boundExpr) boundExprs
+  expr <- mutate (contextDepth + Seq.length boundExprs) expr
+  return $ RobotBind boundExprs expr
+mutateSub contextDepth (RobotFunc argCount expr) = do
   RobotFunc argCount <$> mutate (contextDepth + argCount) expr
 mutateSub contextDepth (RobotApply argExprs funcExpr) = do
-  argExprs <- mapM $ \argExpr -> mutate contextDepth argExpr
+  argExprs <- mapM (\argExpr -> mutate contextDepth argExpr) argExprs
   funcExpr <- mutate contextDepth funcExpr
-  return $ RobotApply argExrs funcExpr
-mutateSub contextDepth (RobotCond condExpr trueExpr falseExpr) =
+  return $ RobotApply argExprs funcExpr
+mutateSub contextDepth (RobotCond condExpr trueExpr falseExpr) = do
   condExpr <- mutate contextDepth condExpr
   trueExpr <- mutate contextDepth trueExpr
   falseExpr <- mutate contextDepth falseExpr
@@ -93,17 +93,18 @@ mutateSub contextDepth (RobotCond condExpr trueExpr falseExpr) =
 mutateDirect :: Int -> RobotExpr -> State.State RobotMutate RobotExpr
 mutateDirect contextDepth expr = do
   case expr of
-    RobotLoad _ | RobotConst _ | RobotSpecialContext _ ->
-      mutateLeaf contextDepth expr
+    RobotLoad _ -> mutateLeaf contextDepth expr
+    RobotConst _ -> mutateLeaf contextDepth expr
+    RobotSpecialConst _ -> mutateLeaf contextDepth expr
     _ -> mutateNode contextDepth expr
 
 -- | Directly mutate a leaf expression.
 mutateLeaf :: Int -> RobotExpr -> State.State RobotMutate RobotExpr
 mutateLeaf contextDepth expr = do
-  randomValue <- random
+  probability <- random
   replaceLeafChance <-
     robotParamsMutationReplaceLeafChance <$> robotMutateParams <$> State.get
-  if randomValue <= replaceLeafChance
+  if probability <= replaceLeafChance
     then randomExpr contextDepth
     else
       case expr of
@@ -114,17 +115,17 @@ mutateLeaf contextDepth expr = do
 -- | Directly mutate a node expression.
 mutateNode :: Int -> RobotExpr -> State.State RobotMutate RobotExpr
 mutateNode contextDepth expr = do
-  randomValue <- random
+  probability <- random
   replaceNodeChance <-
     robotParamsMutationReplaceNodeChance <$> robotMutateParams <$> State.get
-  if randomValue <= replaceNodeChance
+  if probability <= replaceNodeChance
     then randomExpr contextDepth
     else
       case expr of
         RobotBind boundExprs expr -> mutateBind contextDepth boundExprs expr
         RobotFunc argCount expr -> mutateFunc contextDepth argCount expr
         RobotApply argExprs expr -> mutateApply contextDepth argExprs expr
-        _ -> expr
+        _ -> return expr
 
 -- | Directly mutate a bind expression.
 mutateBind :: Int -> Seq.Seq RobotExpr -> RobotExpr ->
@@ -138,7 +139,7 @@ mutateBind contextDepth boundExprs expr = do
   expr' <- adjustLoads oldBindCount (bindCount - oldBindCount) expr
   if bindCount <= oldBindCount
     then return $ RobotBind boundExprs' expr'
-    else do newBoundExprs <- replicateM (bindCount - oldBindCount)
+    else do newBoundExprs <- Seq.replicateM (bindCount - oldBindCount)
                              (randomExpr (contextDepth + bindCount))
             return $ RobotBind (boundExprs' >< newBoundExprs) expr'
 
@@ -153,36 +154,36 @@ mutateFunc contextDepth argCount expr = do
 mutateApply :: Int -> Seq.Seq RobotExpr -> RobotExpr ->
                State.State RobotMutate RobotExpr
 mutateApply contextDepth argExprs funcExpr = do
-  applyMaxCount <- robotParamsRandomApplyMaxCount <$> robotMutatesParams <$> State.get
+  applyMaxCount <- robotParamsRandomApplyMaxCount <$> robotMutateParams <$> State.get
   applyCount <- randomR (0, applyMaxCount)
   let oldApplyCount = Seq.length argExprs
       argExprs' = Seq.take applyCount argExprs
   if applyCount <= oldApplyCount
     then return $ RobotApply argExprs' funcExpr
-    else do newArgExprs <- replicateM (applyCount - oldApplyCount)
+    else do newArgExprs <- Seq.replicateM (applyCount - oldApplyCount)
                            (randomExpr contextDepth)
-            return $ RobotApply (argExprs' >< newArgExprs) expr
+            return $ RobotApply (argExprs' >< newArgExprs) funcExpr
 
 -- | Adjust load expressions.
 adjustLoads :: Int -> Int -> RobotExpr -> State.State RobotMutate RobotExpr
-adjustLoads threshold delta (RobotLoad index)@expr = do
+adjustLoads threshold delta expr@(RobotLoad index) = do
   if index < threshold
   then return expr
   else if (index >= threshold) && (delta < 0) && (index < threshold - delta)
-    RobotLoad <$> randomR (0, contextDepth)
+  then RobotLoad <$> randomR (0, threshold - 1)
   else return . RobotLoad $ index + delta
-adjustLoads _ _ (RobotConst _)@expr = return expr
-adjustLoads _ _ (RobotSpecialConst _)@expr = return expr
+adjustLoads _ _ expr@(RobotConst _) = return expr
+adjustLoads _ _ expr@(RobotSpecialConst _) = return expr
 adjustLoads threshold delta (RobotBind boundExprs expr) = do
   newBoundExprs <- mapM (\boundExpr ->
                           adjustLoads threshold delta boundExpr) boundExprs
   RobotBind newBoundExprs <$> adjustLoads threshold delta expr
-adjustLoads contextDepth (RobotFunc argCount expr) = do
+adjustLoads threshold delta (RobotFunc argCount expr) = do
   RobotFunc argCount <$> adjustLoads threshold delta expr
-adjustLoads contextDepth (RobotApply argExprs expr) = do
+adjustLoads threshold delta (RobotApply argExprs expr) = do
   newArgExprs <- mapM (adjustLoads threshold delta) argExprs
-  RobotBind newArgExrs <$> adjustLoad threshold delta expr
-adjustLoads contextDepth (RobotCond condExpr trueExpr falseExpr) = do
+  RobotBind newArgExprs <$> adjustLoads threshold delta expr
+adjustLoads threshold delta (RobotCond condExpr trueExpr falseExpr) = do
   newCondExpr <- adjustLoads threshold delta condExpr
   newTrueExpr <- adjustLoads threshold delta trueExpr
   newFalseExpr <- adjustLoads threshold delta falseExpr
@@ -204,14 +205,14 @@ randomExpr' contextDepth randomDepth = do
           funcWeight = robotParamsRandomFuncWeight params
           applyWeight = robotParamsRandomApplyWeight params
           condWeight = robotParamsRandomCondWeight params
-      randomValue <- random
-      if randomValue < bindWeight
+      probability <- random
+      if probability < bindWeight
         then randomBind contextDepth randomDepth
-        else if randomValue < bindWeight + funcWeight
+        else if probability < bindWeight + funcWeight
         then randomFunc contextDepth randomDepth
-        else if randomValue < bindWeight + funcWeight + applyWeight
+        else if probability < bindWeight + funcWeight + applyWeight
         then randomApply contextDepth randomDepth
-        else if randomValue < bindWeight + funcWeight + applyWeight + condWeight
+        else if probability < bindWeight + funcWeight + applyWeight + condWeight
         then randomCond contextDepth randomDepth
         else randomSimple contextDepth
 
@@ -261,48 +262,50 @@ randomSimple contextDepth = do
   params <- robotMutateParams <$> State.get
   exprValue <- random
   let constWeight = robotParamsRandomSimpleConstWeight params
-      specialConstWeight = robotParamsRandomSimpleSpecialConstWeight
+      specialConstWeight = robotParamsRandomSimpleSpecialConstWeight params
   if exprValue < constWeight
     then RobotConst <$> randomValue
-    else if exprValue < constWeight + specialConstValue
+    else if exprValue < constWeight + specialConstWeight
     then randomSpecialConst
-    else RandomLoad <$> randomR (0, contextDepth - 1)
+    else RobotLoad <$> randomR (0, contextDepth - 1)
   
 -- | Generate a random value.
 randomValue :: State.State RobotMutate RobotValue
 randomValue = do
   typeValue <- random
-  params <- randomMutateParams <$> State.get
+  params <- robotMutateParams <$> State.get
   let boolWeight = robotParamsRandomBoolWeight params
       intWeight = robotParamsRandomIntWeight params
       floatWeight = robotParamsRandomFloatWeight params
-      vectorWeight = robotParamsRandomVectorWeight arams
+      vectorWeight = robotParamsRandomVectorWeight params
   if typeValue < boolWeight
     then RobotBool <$> randomR (False, True)
     else if typeValue < boolWeight + intWeight
-    then RobotInt <$> randomR $ robotParamsRandomIntRange params
+    then let (minInt, maxInt) = robotParamsRandomIntRange params
+         in RobotInt <$> (randomR (fromIntegral minInt, fromIntegral maxInt))
     else if typeValue < boolWeight + intWeight + floatWeight
-    then RobotFloat <$> randomR $ randomParamsRandomFloatRange params
+    then RobotFloat <$> (randomR $ robotParamsRandomFloatRange params)
     else if typeValue < boolWeight + intWeight + floatWeight + vectorWeight
     then do
-      let maxLength <- robotParamsRandomVectorMaxLength params
+      let maxLength = robotParamsRandomVectorMaxLength params
       lengthValue <- randomR (0, maxLength)
       RobotVector <$> Seq.replicateM lengthValue randomValue
     else return RobotNull
 
 -- | Generate a random special constant.
-randomSpecialConst :: State.State RobotMutate RobotValue
+randomSpecialConst :: State.State RobotMutate RobotExpr
 randomSpecialConst = do
-  randomValue <- random
+  probability <- random
+  params <- robotMutateParams <$> State.get
   let weight = robotParamsRandomIntrinsicWeight params
-  if randomValue < weight
+  if probability < weight
     then randomIntrinsic      
     else RobotSpecialConst <$> randomR (0, robotParamsSpecialValueCount params)
 
 -- | Generate a random intrinsic.
-randomIntrinsic :: State.State RobotMutate RobotValue
+randomIntrinsic :: State.State RobotMutate RobotExpr
 randomIntrinsic = do
-  params <- randomMutateParams <$> State.get
+  params <- robotMutateParams <$> State.get
   let constsLength = Seq.length $ robotParamsSpecialConsts params
   RobotSpecialConst <$> randomR (robotParamsSpecialValueCount params,
                                   constsLength - 1)

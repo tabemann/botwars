@@ -31,15 +31,17 @@
 
 module Robots.Genetic.HunterKiller.Load
 
-  (load)
+  (loadWorld,
+   load)
 
 where
 
 import Robots.Genetic.HunterKiller.Types
+import Robots.Genetic.HunterKiller.Utility
 import Robots.Genetic.HunterKiller.World
-import Data.Text as Text
-import Data.Attoparsec.Text as Atto
-import Data.Sequence as Seq
+import qualified Data.Text as Text
+import qualified Data.Attoparsec.Text as Atto
+import qualified Data.Sequence as Seq
 import Data.Sequence ((<|))
 import Data.Either (isLeft)
 import Data.Functor ((<$>))
@@ -49,15 +51,64 @@ import Control.Applicative ((<*>),
                             (<|>))
 import Data.Char (isSpace)
 
--- | Load a robot program from text.
+-- | Load a robot world from text.
+loadWorld :: Seq.Seq RobotConstEntry -> Text.Text ->
+             Either Text.Text (Seq.Seq RobotExpr)
+loadWorld consts =
+  condenseLefts . Atto.parseOnly (parseWorld consts <* Atto.endOfInput) .
+  prepText
+
+-- | Load a robot from text.
 load :: Seq.Seq RobotConstEntry -> Text.Text -> Either Text.Text RobotExpr
-load consts text =
-  case Atto.parseOnly (parseExpr consts) text of
-    Right expr -> verifyExpr startingContextDepth expr
-    Left errorMessage -> Left . Text.pack $ errorMessage
+load consts =
+  condenseLefts . Atto.parseOnly (parse consts <* Atto.endOfInput) . prepText
+
+-- | Condense lefts
+condenseLefts :: Either String (Either Text.Text b) -> Either Text.Text b
+condenseLefts (Right (Right x)) = Right x
+condenseLefts (Right (Left y)) = Left y
+condenseLefts (Left z) = Left $ Text.pack z
+
+-- | Parse a robot world.
+parseWorld :: Seq.Seq RobotConstEntry ->
+             Atto.Parser (Either Text.Text (Seq.Seq RobotExpr))
+parseWorld consts =
+  Atto.skipSpace *>
+  "world" *>
+  Atto.skipSpace *>
+  "{" *>
+  Atto.skipSpace *>
+  (condenseErrors <$> (Atto.option Seq.empty
+                       ((<|) <$> parse consts
+                             <*> (Seq.fromList <$> (Atto.many'
+                                                    (Atto.skipSpace *>
+                                                     "," *>
+                                                     Atto.skipSpace *>
+                                                     parse consts)))))) <*
+  Atto.skipSpace <*
+  "}" <*
+  Atto.skipSpace
+
+-- | Condense errors from a list of potential errors.
+condenseErrors :: Seq.Seq (Either Text.Text RobotExpr) ->
+                  Either Text.Text (Seq.Seq RobotExpr)
+condenseErrors values =
+  case Seq.findIndexL isLeft values of
+    Just index ->
+      case Seq.lookup index values of
+        Just (Left errorMessage) -> Left errorMessage
+        _ -> error "this should be impossible"
+    Nothing -> Right $ fmap (\value -> case value of
+                                Right value' -> value'
+                                Left _ -> error "this should be impossible")
+                         values
+
+-- | Parse a robot program.
+parse :: Seq.Seq RobotConstEntry -> Atto.Parser (Either Text.Text RobotExpr)
+parse consts = verifyExpr startingContextDepth <$> parseExpr consts
 
 -- | Parse an expression.
-parseExpr :: Seq.Seq RobotConstEntry -> Atto.Parser (Either Text.Text RobotExpr)
+parseExpr :: Seq.Seq RobotConstEntry -> Atto.Parser RobotExpr
 parseExpr consts =
   Atto.choice [parseLoad,
                parseConst,
@@ -96,18 +147,18 @@ parseSpecialConst consts =
 -- | Actually try to parse a special const expression.
 tryVerifySpecialConst :: Seq.Seq RobotConstEntry -> Text.Text -> RobotExpr
 tryVerifySpecialConst consts name =
-  case Seq.elemIndexL name (fmap (\(RobotConstEntry _ name) -> name) const) of
+  case Seq.elemIndexL name (fmap (\(RobotConstEntry _ name) -> name) consts) of
     Just index -> RobotSpecialConst index
     Nothing -> RobotSpecialConst (-1)
 
 -- | Check whether a character is a valid special constant name character
 isSpecialConstChar :: Char -> Bool
-isSpecialConstChar char = (not . isSpace $ char) &&
-                          (char != '[') &&
-                          (char != ']') &&
-                          (char != '(') &&
-                          (char != ')') &&
-                          (char != ',')
+isSpecialConstChar char = (not $ isSpace char) &&
+                          (char /= '[') &&
+                          (char /= ']') &&
+                          (char /= '(') &&
+                          (char /= ')') &&
+                          (char /= ',')
 
 -- | Parse a bind expression.
 parseBind :: Seq.Seq RobotConstEntry -> Atto.Parser RobotExpr
@@ -129,17 +180,19 @@ parseBind consts =
 -- | Parse expression list.
 parseExprs :: Seq.Seq RobotConstEntry -> Atto.Parser (Seq.Seq RobotExpr)
 parseExprs consts =
+  Atto.skipSpace *>
   "{" *>
   Atto.skipSpace *>
   Atto.option Seq.empty
-   ((<|) <$> (parseExpr consts <*>
-              (Seq.fromList <$> (Atto.many1
+   ((<|) <$> parseExpr consts
+         <*> (Seq.fromList <$> (Atto.many'
                                  (Atto.skipSpace *>
                                   "," *>
                                   Atto.skipSpace *>
-                                  parseExpr consts))))) <*
+                                  parseExpr consts)))) <*
   Atto.skipSpace <*
-  "}")
+  "}" <*
+  Atto.skipSpace
 
 -- | Parse a func expression.
 parseFunc :: Seq.Seq RobotConstEntry -> Atto.Parser RobotExpr
@@ -147,7 +200,7 @@ parseFunc consts =
   RobotFunc <$> (Atto.skipSpace *>
                  "func" *>
                  Atto.skipSpace *>
-                 decimal)
+                 Atto.decimal)
             <*> (Atto.skipSpace *>
                  "as" *>
                  Atto.skipSpace *>
@@ -231,36 +284,36 @@ parseValue =
                    Atto.takeWhile1 isSpace *>
                    Atto.double <*
                    Atto.skipSpace)) <|>
-  ((RobotVector . Seq.fromList) <$>
+  (RobotVector <$>
    (Atto.skipSpace *>
     "[" *>
     Atto.skipSpace *>
-    Atto.option Seq.empty
-     ((<|) <$> (parseValue <*>
-                (Seq.fromList <$> (Atto.many1
-                                   (Atto.skipSpace *>
-                                    "," *>
-                                    Atto.skipSpace *>
-                                    parseValue))))) <*
+    (Atto.option Seq.empty
+     ((<|) <$> parseValue
+           <*> (Seq.fromList <$> (Atto.many'
+                                  (Atto.skipSpace *>
+                                   "," *>
+                                   Atto.skipSpace *>
+                                   parseValue))))) <*
      
     Atto.skipSpace <*
     "]"))
 
 -- | Verify an expression.
 verifyExpr :: Int -> RobotExpr -> Either Text.Text RobotExpr
-verifyExpr contextDepth (RobotLoad index)@expr =
+verifyExpr contextDepth expr@(RobotLoad index) =
   if (index >= 0) && (index < contextDepth)
   then Right expr
   else Left "invalid load index"
-verifyExpr _ (RobotConst _)@expr = Right expr
-verifyExpr _ (RobotSpecialConst index)@expr =
+verifyExpr _ expr@(RobotConst _) = Right expr
+verifyExpr _ expr@(RobotSpecialConst index) =
   if index >= 0
   then Right expr
   else Left "unknown special constant"
-verifyExpr contextDepth (RobotBind boundExprs expr')@expr =
+verifyExpr contextDepth expr@(RobotBind boundExprs expr') =
   let boundExprs' =
-        fmap (verifyExpr $ contextDepth + Seq.length boundExprs) boundExprs
-  in case Seq.elemIndexL isLeft boundExprs' of
+        fmap (verifyExpr (contextDepth + Seq.length boundExprs)) boundExprs
+  in case Seq.findIndexL isLeft boundExprs' of
        Just index ->
          case Seq.lookup index boundExprs' of
            Just exprError -> exprError
@@ -269,13 +322,13 @@ verifyExpr contextDepth (RobotBind boundExprs expr')@expr =
          case verifyExpr (contextDepth + Seq.length boundExprs) expr' of
            Right _ -> Right expr
            exprError -> exprError
-verifyExpr contextDepth (RobotFunc argCount expr')@expr =
+verifyExpr contextDepth expr@(RobotFunc argCount expr') =
   case verifyExpr (contextDepth + argCount) expr' of
     Right _ -> Right expr
     exprError -> exprError
-verifyExpr contextDepth (RobotApply argExprs funcExpr)@expr =
+verifyExpr contextDepth expr@(RobotApply argExprs funcExpr) =
   let argExprs' = fmap (verifyExpr contextDepth) argExprs
-  in case Seq.elemIndexL isLeft argExprs' of
+  in case Seq.findIndexL isLeft argExprs' of
        Just index ->
          case Seq.lookup index argExprs' of
            Just exprError -> exprError
@@ -284,7 +337,7 @@ verifyExpr contextDepth (RobotApply argExprs funcExpr)@expr =
          case verifyExpr contextDepth funcExpr of
            Right _ -> Right expr
            exprError -> exprError
-verifyExpr contextDepth (RobotCond condExpr trueExpr falseExpr)@expr =
+verifyExpr contextDepth expr@(RobotCond condExpr trueExpr falseExpr) =
   case verifyExpr contextDepth condExpr of
     Right _ ->
       case verifyExpr contextDepth trueExpr of

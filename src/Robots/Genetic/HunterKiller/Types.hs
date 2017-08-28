@@ -32,12 +32,13 @@
 module Robots.Genetic.HunterKiller.Types
   
   (RobotWorld (..),
+   RobotCont (..),
    RobotMutate (..),
    RobotParams (..),
    RobotConstEntry (..),
    RobotState (..),
    Robot (..),
-   RobotVM (..),
+   Shot (..),
    RobotValue (..),
    RobotIntrinsicFunc,
    RobotExpr (..),
@@ -45,21 +46,23 @@ module Robots.Genetic.HunterKiller.Types
    RobotAction (..),
    RobotEvent (..),
    RobotInput (..),
-   RobotCycleState (..))
+   RobotCycleState (..),
+   RobotConfigEntry (..),
+   RobotConfigValue (..))
   
 where
 
-import Data.Sequence as Seq
-import Control.Monad.State.Strict as State
-import System.Random as Random
+import qualified Data.Sequence as Seq
+import qualified Data.Text as Text
+import qualified Control.Monad.State.Strict as State
+import qualified System.Random as Random
 
 -- | Robot continuity type
 data RobotCont m =
   RobotCont { robotContParams :: RobotParams,
               robotContRandom :: Random.StdGen,
               robotContPrograms :: Seq.Seq RobotExpr,
-              robotCondEventHandler :: RobotEvent -> m RobotInput }
-  deriving (Eq)
+              robotContEventHandler :: RobotEvent -> m RobotInput }
 
 -- | Robot world type
 data RobotWorld =
@@ -70,19 +73,17 @@ data RobotWorld =
                robotWorldKills :: Int,
                robotWorldNextRobotIndex :: Int,
                robotWorldRandom :: Random.StdGen }
-  deriving (Eq)
 
 -- | Robot mutation state type
 data RobotMutate =
   RobotMutate { robotMutateParams :: RobotParams,
                 robotMutateRandom :: Random.StdGen }
-  deriving (Eq)
 
 -- | Robot parameters
 data RobotParams =
   RobotParams { robotParamsLocationFriction :: Double,
                 robotParamsRotationFriction :: Double,
-                robotParamsFireFactor :: Doublle,
+                robotParamsFireFactor :: Double,
                 robotParamsThrustFactor :: Double,
                 robotParamsTurnFactor :: Double,
                 robotParamsShotSpeed :: Double,
@@ -104,7 +105,7 @@ data RobotParams =
                 robotParamsMinInitialGeneralEnergy :: Double,
                 robotParamsMaxInitialGeneralEnergy :: Double,
                 robotParamsMinInitialWeaponEnergy :: Double,
-                robotParamsMaxInitialWeaponEnergy :: Dobule,
+                robotParamsMaxInitialWeaponEnergy :: Double,
                 robotParamsMinInitialHealth :: Double,
                 robotParamsMaxInitialHealth :: Double,
                 robotParamsMinInitialLocationDeltaAbs :: Double,
@@ -118,7 +119,7 @@ data RobotParams =
                 robotParamsRandomIntWeight :: Double,
                 robotParamsRandomFloatWeight :: Double,
                 robotParamsRandomVectorWeight :: Double,
-                robotParamsRandomInstrinsicWeight :: Double,
+                robotParamsRandomIntrinsicWeight :: Double,
                 robotParamsRandomIntRange :: (Int, Int),
                 robotParamsRandomFloatRange :: (Double, Double),
                 robotParamsRandomVectorMaxLength :: Int,
@@ -136,18 +137,15 @@ data RobotParams =
                 robotParamsReproduction :: Seq.Seq Int,
                 robotParamsSpecialConsts :: Seq.Seq RobotValue,
                 robotParamsSpecialValueCount :: Int }
-  deriving (Eq)
 
 -- | Intrinsic entry type
 data RobotConstEntry = RobotConstEntry RobotValue Text.Text
-                     deriving (Eq)
 
 -- | Robot state
 data RobotState =
   RobotState { robotStateParams :: RobotParams,
                robotStateDepth :: Int,
                robotStateInstrCount :: Int }
-  deriving (Eq)
 
 -- | Robot type
 data Robot =
@@ -162,7 +160,6 @@ data Robot =
           robotWeaponEnergy :: Double,
           robotHealth :: Double,
           robotScore :: Int }
-  deriving (Eq)
 
 -- | Shot type
 data Shot =
@@ -170,7 +167,6 @@ data Shot =
          shotLocationDelta :: (Double, Double),
          shotEnergy :: Double,
          shotRobotIndex :: Int }
-  deriving (Eq)
 
 -- | Robot value type
 data RobotValue = RobotNull
@@ -181,7 +177,6 @@ data RobotValue = RobotNull
                 | RobotClosure RobotContext Int RobotExpr
                 | RobotIntrinsic RobotIntrinsicFunc
                 | RobotOutput RobotValue RobotAction
-                deriving (Eq)
 
 -- | Robot intrinsic function
 type RobotIntrinsicFunc =
@@ -195,31 +190,32 @@ data RobotExpr = RobotLoad Int
                | RobotFunc Int RobotExpr
                | RobotApply (Seq.Seq RobotExpr) RobotExpr
                | RobotCond RobotExpr RobotExpr RobotExpr
-               deriving (Eq)
 
 -- | Robot context type
-newtype RobotContext = RobotContext (Seq.Seq Value)
-  deriving (Eq)
+newtype RobotContext = RobotContext (Seq.Seq RobotValue)
 
 -- | Robot action
 data RobotAction =
   RobotAction { robotActionFirePower :: Double,
                 robotActionThrustPower :: Double,
                 robotActionTurnPower :: Double }
-  deriving (Eq)
 
 -- | Robot event
 data RobotEvent = RobotNewRound RobotWorld
                 | RobotWorldCycle RobotWorld
                 | RobotRoundDone RobotWorld
-                deriving (Eq)
 
 -- | Robot input
 data RobotInput = RobotContinue
                 | RobotExit
-                deriving (Eq)
 
 -- | Robot cycle state
 data RobotCycleState = RobotNextCycle
                      | RobotEndRound
-                     deriving (Eq)
+
+-- | Robot config entry
+data RobotConfigEntry = RobotConfigEntry Text.Text RobotConfigValue
+
+-- | Robot config value
+data RobotConfigValue = RobotConfigNum Double
+                      | RobotConfigVector (Seq.Seq RobotConfigValue)

@@ -31,15 +31,21 @@
 
 module Robots.Genetic.HunterKiller.Save
 
-  (save)
+  (saveWorld,
+   save)
 
 where
 
 import Robots.Genetic.HunterKiller.Types
-import Data.Sequence as Seq
-import Data.Text as Text
+import qualified Data.Sequence as Seq
+import qualified Data.Text as Text
 import Text.Printf (printf)
 import Data.Foldable (foldl')
+
+-- | Save a robot world as text.
+saveWorld :: Seq.Seq RobotConstEntry -> Seq.Seq RobotExpr -> Text.Text
+saveWorld consts exprs =
+  Text.intercalate "\n" ["world", outputExprs consts 1 1 exprs]
 
 -- | Save a robot program as text.
 save :: Seq.Seq RobotConstEntry -> RobotExpr -> Text.Text
@@ -49,8 +55,8 @@ save consts expr = outputExpr consts 0 0 expr
 outputExpr :: Seq.Seq RobotConstEntry -> Int -> Int -> RobotExpr -> Text.Text
 outputExpr _ firstIndent _ (RobotLoad index) =
   indentText firstIndent . Text.pack $ printf "load %i" index
-outputExpr _ firstIndent nextIndent (RobotConst value) =
-  let valueText = outputValue 0 (nextIndent + Text.length "const ") value
+outputExpr _ firstIndent nextIndex (RobotConst value) =
+  let valueText = outputValue 0 (nextIndex + Text.length "const ") value
   in indentText firstIndent . Text.pack $
        printf "const %s" valueText
 outputExpr consts firstIndent _ (RobotSpecialConst index) =
@@ -80,7 +86,7 @@ outputExpr consts firstIndex nextIndex (RobotCond condExpr trueExpr falseExpr) =
      outputParenExpr consts (nextIndex + 1) (nextIndex + 1) condExpr,
      indentText nextIndex "then",
      outputParenExpr consts (nextIndex + 1) (nextIndex + 1) trueExpr,
-     indentText nextIndex "else"
+     indentText nextIndex "else",
      outputParenExpr consts (nextIndex + 1) (nextIndex + 1) falseExpr]
 
 -- | Output a list of expressions.
@@ -88,29 +94,33 @@ outputExprs :: Seq.Seq RobotConstEntry -> Int -> Int -> Seq.Seq RobotExpr ->
                Text.Text
 outputExprs consts firstIndex nextIndex exprs =
   case Seq.length exprs of
-    0 -> indentText firstIndent "{}"
+    0 -> indentText firstIndex "{}"
     1 ->
       case Seq.lookup 0 exprs of
-        Just expr -> let exprText = outputExpr consts 0 (nextIndent + 1) expr
-                     in indentText firstIndent . Text.pack $
+        Just expr -> let exprText = outputExpr consts 0 (nextIndex + 1) expr
+                     in indentText firstIndex . Text.pack $
                           printf "{%s}" exprText
         Nothing -> error "this should be impossible"
-    _ -> let exprText = outputExpr consts 0 (nextIndent + 1) expr
-             firstLine = indentText firstIndent . Text.pack $
-                           printf "{%s," exprText
-             (_, text) = foldl' (\(count, text) expr ->
-                                   let exprText = outputExpr consts
-                                                    (nextIndent + 1)
-                                                    (nextIndent + 1) expr
-                                       nextLine =
-                                         if count > 0
-                                         then Text.append exprText ","
-                                         else Text.append exprText "]"
-                                   in (count - 1,
-                                       Text.append (Text.append text "\n")
-                                         nextLine))
-                           (Seq.length exprs - 1, firstLine) exprs
-         in text
+    _ -> case Seq.lookup 0 exprs of
+           Just expr ->
+             let exprText = outputExpr consts 0 (nextIndex + 1) expr
+                 firstLine = indentText firstIndex . Text.pack $
+                             printf "{%s," exprText
+                 (_, text) = foldl' (\(count, text) expr ->
+                                       let exprText = outputExpr consts
+                                                      (nextIndex + 1)
+                                                      (nextIndex + 1) expr
+                                           nextLine =
+                                             if count > 0
+                                             then Text.append exprText ","
+                                             else Text.append exprText "}"
+                                       in (count - 1,
+                                           Text.append (Text.append text "\n")
+                                           nextLine))
+                             (Seq.length exprs - 2, firstLine)
+                             (Seq.drop 1 exprs)
+             in text
+           Nothing -> error "this should be impossible"
 
 -- | Output an expression in parentheses.
 outputParenExpr :: Seq.Seq RobotConstEntry -> Int -> Int -> RobotExpr ->
@@ -121,37 +131,42 @@ outputParenExpr consts firstIndex nextIndex expr =
 
 -- | Output a value as text.
 outputValue :: Int -> Int -> RobotValue -> Text.Text
-outputValue firstIndent _ RobotNull = indentText firstIndent "null"
-outputValue firstIndent _ (RobotBool True) = indentText firstIndent "true"
-outputValue firstIndent _ (RobotBool False) = indentText firstIndent "false"
-outputValue firstIndent _ (RobotInt value) =
-  indentText firstIndent . Text.pack $ printf "int %i" value
-outputValue firstIndent _ (RobotFloat value) =
-  indentText firstIndent . Text.pack $ printf "float %g" value
-outputValue firstIndent nextIndent (RobotVector values) =
+outputValue firstIndex _ RobotNull = indentText firstIndex "null"
+outputValue firstIndex _ (RobotBool True) = indentText firstIndex "true"
+outputValue firstIndex _ (RobotBool False) = indentText firstIndex "false"
+outputValue firstIndex _ (RobotInt value) =
+  indentText firstIndex . Text.pack $ printf "int %i" value
+outputValue firstIndex _ (RobotFloat value) =
+  indentText firstIndex . Text.pack $ printf "float %g" value
+outputValue firstIndex nextIndex (RobotVector values) =
   case Seq.length values of
-    0 -> indentText firstIndent "[]"
+    0 -> indentText firstIndex "[]"
     1 ->
       case Seq.lookup 0 values of
-        Just value -> let valueText = outputValue 0 (nextIndent + 1) value
-                      in indentText firstIndent . Text.pack $
+        Just value -> let valueText = outputValue 0 (nextIndex + 1) value
+                      in indentText firstIndex . Text.pack $
                            printf "[%s]" valueText
         Nothing -> error "this should be impossible"
-    _ -> let valueText = outputValue 0 (nextIndent + 1) value
-             firstLine = indentText firstIndent . Text.pack $
-                           printf "[%s," valueText
-             (_, text) = foldl' (\(count, text) value ->
-                                   let valueText = outputValue (nextIndent + 1)
-                                                     (nextIndent + 1) value
-                                       nextLine =
-                                         if count > 0
-                                         then Text.append valueText ","
-                                         else Text.append valueText "]"
-                                   in (count - 1,
-                                       Text.append (Text.append text "\n")
+    _ ->
+      case Seq.lookup 0 values of
+        Just value ->
+          let valueText = outputValue 0 (nextIndex + 1) value
+              firstLine = indentText firstIndex . Text.pack $
+                          printf "[%s," valueText
+              (_, text) = foldl' (\(count, text) value ->
+                                    let valueText = outputValue (nextIndex + 1)
+                                                    (nextIndex + 1) value
+                                        nextLine =
+                                          if count > 0
+                                          then Text.append valueText ","
+                                          else Text.append valueText "]"
+                                    in (count - 1,
+                                         Text.append (Text.append text "\n")
                                          nextLine))
-                           (Seq.length values - 1, firstLine) values
-         in text
+                          (Seq.length values - 2, firstLine)
+                          (Seq.drop 1 values)
+          in text
+        Nothing -> error "this should be impossible"
 
 -- | Generate an indent string.
 indentText :: Int -> Text.Text -> Text.Text

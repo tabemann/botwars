@@ -30,17 +30,21 @@
 module Robots.Genetic.HunterKiller.VM
 
   (execute,
+   apply,
+   applyTail,
    updateStateInto,
    updateStateTail,
    updateStateFinish,
    castToBool,
    castToInt,
    castToInteger,
-   caseToDouble)
+   castToDouble)
+
+where
 
 import Robots.Genetic.HunterKiller.Types
-import Control.Monad.State.Strict as State
-import Data.Sequence as Seq
+import qualified Control.Monad.State.Strict as State
+import qualified Data.Sequence as Seq
 import Data.Sequence ((><),
                       (|>))
 import Control.Monad (mapM,
@@ -51,8 +55,9 @@ execute :: RobotContext -> RobotExpr -> State.State RobotState RobotValue
 execute (RobotContext context) expr = do
   depth <- robotStateDepth <$> State.get
   instrCount <- robotStateInstrCount <$> State.get
-  maxDepth <- robotParamsMaxDepth . robotStateParams <$> State.get
-  maxInstrCount <- robotParamsMaxInstrCount . robotStateParams <$> State.get
+  params <- robotStateParams <$> State.get
+  let maxDepth = robotParamsMaxDepth params
+      maxInstrCount = robotParamsMaxInstrCount params
   if (depth <= maxDepth) && (instrCount <= maxInstrCount)
     then
       case expr of
@@ -62,7 +67,9 @@ execute (RobotContext context) expr = do
                         Nothing -> RobotNull
           in do updateStateFinish
                 return value
-        RobotConst value -> (value, updateStateFinish state)
+        RobotConst value -> do
+          updateStateFinish
+          return value
         RobotSpecialConst index ->
           let value = case Seq.lookup index $ robotParamsSpecialConsts params of
                         Just value -> value
@@ -71,8 +78,8 @@ execute (RobotContext context) expr = do
                 return value
         RobotBind boundExprs expr -> do
           let preBoundContext = context >< Seq.replicate (Seq.length boundExprs)
-                                (Seq.singleton RobotNull)
-          args <- executeArgExprs (RobotContext (context >< Seq.replicate (Seq.singleton RobotNull)) boundExprs
+                                RobotNull
+          args <- executeArgExprs (RobotContext preBoundContext) boundExprs
           updateStateTail
           execute (RobotContext (context >< args)) expr
         RobotFunc argCount expr -> do
@@ -80,10 +87,9 @@ execute (RobotContext context) expr = do
           return $ RobotClosure (RobotContext context) argCount expr
         RobotApply argExprs funcExpr -> do
           updateStateInto
-          func <- execute (RobotContext context) (updateStateInto state)
-                  funcExpr
+          func <- execute (RobotContext context) funcExpr
           args <- executeArgExprs (RobotContext context) argExprs
-          applyTail state args func
+          applyTail args func
         RobotCond condExpr trueExpr falseExpr -> do
           updateStateInto
           condValue <- execute (RobotContext context) condExpr
@@ -104,38 +110,38 @@ executeArgExprs context exprs =
            if instrCount <= maxInstrCount
              then do updateStateInto
                      execute context expr
-             else RobotNull)
+             else return RobotNull)
        exprs
 
 -- | Apply function.
 apply :: Seq.Seq RobotValue -> RobotValue -> State.State RobotState RobotValue
-apply args (RobotClosure context argCount expr) =
+apply args (RobotClosure (RobotContext context) argCount expr) =
   let args' = Seq.take argCount args
   in let args = args' >< (Seq.replicate (argCount - (Seq.length args'))
-                          (Seq.singleton RobotNull))
+                          RobotNull)
   in do updateStateInto
-        execute (context >< args) expr
+        execute (RobotContext (context >< args)) expr
 apply args (RobotIntrinsic func) = do
   updateStateInto
   func args
 apply args _ = do
-  updateStateFinish state
+  updateStateFinish
   return RobotNull
 
 -- | Apply function.
 applyTail :: Seq.Seq RobotValue -> RobotValue ->
              State.State RobotState RobotValue
-applyTail args (RobotClosure context argCount expr) =
+applyTail args (RobotClosure (RobotContext context) argCount expr) =
   let args' = Seq.take argCount args
   in let args = args' >< (Seq.replicate (argCount - (Seq.length args'))
-                          (Seq.singleton RobotNull))
+                          RobotNull)
   in do updateStateTail
-        execute (context >< args) expr
+        execute (RobotContext (context >< args)) expr
 applyTail args (RobotIntrinsic func) = do
   updateStateTail
   func args
 applyTail args _ = do
-  updateStateFinish state
+  updateStateFinish
   return RobotNull
 
 -- | Update state for next deeper instruction.

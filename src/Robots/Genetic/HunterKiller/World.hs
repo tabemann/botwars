@@ -104,10 +104,12 @@ collideRobotWithShots robot shots = do
   let (shotsThatHit, shotsThatDidNotHit) =
         Seq.partition
           (\shot ->
-             let relativeLocation =
-                   subVector (shotLocation shot) (robotLocation robot)
-                 distance = absVector relativeLocation
-             in distance < robotParamsRobotRadius params)
+             if robotIndex robot /= shotRobotIndex shot
+             then let relativeLocation =
+                        subVector (shotLocation shot) (robotLocation robot)
+                      distance = absVector relativeLocation
+                  in distance < robotParamsRobotRadius params
+             else False)
           shots
       shotHarm =
         sum $ fmap (\shot ->

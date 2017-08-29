@@ -123,6 +123,7 @@ data RobotParams =
                 robotParamsRandomIntRange :: (Int, Int),
                 robotParamsRandomFloatRange :: (Double, Double),
                 robotParamsRandomVectorMaxLength :: Int,
+                robotParamsRandomValueMaxDepth :: Int,
                 robotParamsRandomBindMaxCount :: Int,
                 robotParamsRandomFuncMaxCount :: Int,
                 robotParamsRandomApplyMaxCount :: Int,

@@ -97,17 +97,48 @@ prepareNextRound :: Monad m => RobotWorld -> State.StateT (RobotCont m) m ()
 prepareNextRound world = do
   params <- robotContParams <$> State.get
   let reproduction = robotParamsReproduction params
-      sortedRobots = Seq.sortBy (\robot0 robot1 -> compare (robotScore robot1)
-                                  (robotScore robot0)) (robotWorldRobots world)
+      sortedRobots = Seq.sortBy
+        (\robot0 robot1 -> compare (exprSize (robotExpr robot1))
+          (exprSize (robotExpr robot0))) (robotWorldRobots world)
+      sortedRobots' = Seq.sortBy (\robot0 robot1 -> compare (robotScore robot1)
+                                   (robotScore robot0)) sortedRobots
       totalNew = foldl' (+) 0 reproduction
-      sortedRobots' = Seq.take (Seq.length sortedRobots - totalNew) sortedRobots
-      programs = fmap robotExpr sortedRobots'
+      sortedRobots'' =
+        Seq.take (Seq.length sortedRobots - totalNew) sortedRobots'
+      programs = fmap robotExpr sortedRobots''
       (programs', gen) = foldl' (reproduce params)
                            (programs, robotWorldRandom world)
                            (Seq.zip programs reproduction)
   State.modify $ \contState ->
                    contState { robotContPrograms = programs',
                                robotContRandom = robotWorldRandom world }
+
+-- | Get the "size" of an expression.
+exprSize :: RobotExpr -> Int
+exprSize (RobotLoad _) = 1
+exprSize (RobotConst value) = valueSize value
+exprSize (RobotSpecialConst _) = 1
+exprSize (RobotBind bindExprs expr) =
+  1 + foldl' (\size boundExpr -> size + exprSize boundExpr) 0 bindExprs +
+  exprSize expr
+exprSize (RobotFunc _ expr) = 1 + exprSize expr
+exprSize (RobotApply argExprs funcExpr) =
+  1 + foldl' (\size argExpr -> size + exprSize argExpr) 0 argExprs +
+  exprSize funcExpr
+exprSize (RobotCond condExpr trueExpr falseExpr) =
+  1 + exprSize condExpr + exprSize trueExpr + exprSize falseExpr
+
+-- | Get the "size" of a value.
+valueSize :: RobotValue -> Int
+valueSize RobotNull = 1
+valueSize (RobotBool _) = 1
+valueSize (RobotInt _) = 1
+valueSize (RobotFloat _) = 1
+valueSize (RobotVector values) =
+  1 + foldl' (\size value -> size + valueSize value) 0 values
+valueSize (RobotClosure _ _ _) = 1
+valueSize (RobotIntrinsic _) = 1
+valueSize (RobotOutput value _) = 1 + valueSize value
 
 -- | Reproduce a robot
 reproduce :: RobotParams -> (Seq.Seq RobotExpr, Random.StdGen) ->

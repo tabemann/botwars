@@ -59,8 +59,10 @@ import System.IO (stderr,
 import System.Environment (getArgs,
                            getProgName)
 import Control.Exception (catch,
-                          IOException)
+                          IOException,
+                          SomeException)
 import qualified GI.Gtk as Gtk
+import qualified GI.Gdk as Gdk
 import GI.Cairo.Structs.Context (Context(..))
 import qualified Graphics.Rendering.Cairo as Cairo
 import Data.GI.Base
@@ -79,7 +81,8 @@ import Data.IORef (IORef,
 import System.Random (newStdGen)
 import Data.Foldable (foldl')
 import GI.GLib (idleAdd,
-                pattern PRIORITY_DEFAULT)
+                pattern PRIORITY_DEFAULT,
+                pattern PRIORITY_HIGH)
 
 -- | The main action.
 main :: IO ()
@@ -171,13 +174,17 @@ setup exprs params savePath = do
 
   gen <- newStdGen
   
-  forkIO $ do
-    _ <- combat (handleRobotEvent canvas worldRef) exprs params gen
-    return ()
+  --Gdk.threadsAddIdle PRIORITY_DEFAULT $ #queueDraw canvas >> return True
 
   #showAll window
 
   forkOS Gtk.main
+
+  forkIO $ do
+    catch (combat (handleRobotEvent canvas worldRef) exprs params gen >> return ())
+      (\e -> putStr . printf "%s\n" $ show (e :: SomeException))
+    putStr "Exited\n"
+    return ()
 
   exitStatus <- takeMVar exit
 
@@ -203,14 +210,18 @@ handleRobotEvent :: Gtk.DrawingArea -> IORef (Maybe RobotWorld) ->
                     RobotEvent -> IO RobotInput
 handleRobotEvent canvas worldRef (RobotNewRound world) = do
   writeIORef worldRef (Just world)
-  idleAdd PRIORITY_DEFAULT $ #queueDraw canvas >> return False
+--  Gdk.threadsAddIdle PRIORITY_HIGH $ #queueDraw canvas >> return False
+  putStr "RobotNewRound\n"
   return RobotContinue
 handleRobotEvent canvas worldRef (RobotWorldCycle world) = do
   writeIORef worldRef (Just world)
-  idleAdd PRIORITY_DEFAULT $ #queueDraw canvas >> return False
+  Gdk.threadsAddIdle PRIORITY_HIGH $ #queueDraw canvas >> return False
   threadDelay 10
+  putStr $ printf "Robots: %d Shots: %d\n" (Seq.length $ robotWorldRobots world)
+    (Seq.length $ robotWorldShots world)
   return RobotContinue
 handleRobotEvent canvas worldRef (RobotRoundDone world) = do
   writeIORef worldRef (Just world)
-  idleAdd PRIORITY_DEFAULT $ #queueDraw canvas >> return False
+--  Gdk.threadsAddIdle PRIORITY_HIGH $ #queueDraw canvas >> return False
+  putStr "RobotRoundDone\n"
   return RobotContinue

@@ -141,6 +141,7 @@ parseSpecialConst :: Seq.Seq RobotConstEntry -> Atto.Parser RobotExpr
 parseSpecialConst consts =
   tryVerifySpecialConst consts <$> (Atto.skipSpace *>
                                     "special" *>
+                                    Atto.skipSpace *>
                                     Atto.takeWhile1 isSpecialConstChar <*
                                     Atto.skipSpace)
 
@@ -158,6 +159,8 @@ isSpecialConstChar char = (not $ isSpace char) &&
                           (char /= ']') &&
                           (char /= '(') &&
                           (char /= ')') &&
+                          (char /= '{') &&
+                          (char /= '}') &&
                           (char /= ',')
 
 -- | Parse a bind expression.
@@ -183,13 +186,13 @@ parseExprs consts =
   Atto.skipSpace *>
   "{" *>
   Atto.skipSpace *>
-  Atto.option Seq.empty
-   ((<|) <$> parseExpr consts
-         <*> (Seq.fromList <$> (Atto.many'
-                                 (Atto.skipSpace *>
-                                  "," *>
-                                  Atto.skipSpace *>
-                                  parseExpr consts)))) <*
+  (Atto.option Seq.empty
+    ((<|) <$> parseExpr consts
+          <*> (Seq.fromList <$> (Atto.many'
+                                  (Atto.skipSpace *>
+                                   "," *>
+                                   Atto.skipSpace *>
+                                   parseExpr consts))))) <*
   Atto.skipSpace <*
   "}" <*
   Atto.skipSpace

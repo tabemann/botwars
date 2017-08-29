@@ -96,6 +96,7 @@ defaultParams =
                 robotParamsRandomIntRange = (-10, 10),
                 robotParamsRandomFloatRange = (-2.0, 2.0),
                 robotParamsRandomVectorMaxLength = 10,
+                robotParamsRandomValueMaxDepth = 5,
                 robotParamsRandomBindMaxCount = 10,
                 robotParamsRandomFuncMaxCount = 10,
                 robotParamsRandomApplyMaxCount = 10,
@@ -106,7 +107,7 @@ defaultParams =
                 robotParamsRandomApplyWeight = 0.2,
                 robotParamsRandomCondWeight = 0.2,
                 robotParamsRandomApplySpecialWeight = 0.75,
-                robotParamsRandomMaxDepth = 10,
+                robotParamsRandomMaxDepth = 4,
                 robotParamsReproduction = Seq.fromList [3, 2, 1],
                 robotParamsSpecialConsts = specialConsts,
                 robotParamsSpecialValueCount = specialValueCount }
@@ -262,6 +263,9 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
   else if name == "randomVectorMaxLength"
   then parseInt entry $
        \value -> params { robotParamsRandomVectorMaxLength = value }
+  else if name == "randomValueMaxDepth"
+  then parseInt entry $
+       \value -> params { robotParamsRandomValueMaxDepth = value }
   else if name == "randomBindMaxCount"
   then parseInt entry $
        \value -> params { robotParamsRandomBindMaxCount = value }

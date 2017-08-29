@@ -36,6 +36,7 @@ import Robots.Genetic.HunterKiller.Utility
 import qualified Graphics.Rendering.Cairo as Cairo
 import qualified Data.Sequence as Seq
 import Control.Monad (mapM_)
+import Control.Monad.IO.Class (liftIO)
 
 -- | Draw a world.
 drawWorld :: RobotWorld -> Double -> Double -> Cairo.Render ()

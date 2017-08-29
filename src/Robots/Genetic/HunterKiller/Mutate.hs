@@ -207,13 +207,13 @@ randomExpr' contextDepth randomDepth = do
           condWeight = robotParamsRandomCondWeight params
       probability <- random
       if probability < bindWeight
-        then randomBind contextDepth randomDepth
+        then randomBind contextDepth (randomDepth + 1)
         else if probability < bindWeight + funcWeight
-        then randomFunc contextDepth randomDepth
+        then randomFunc contextDepth (randomDepth + 1)
         else if probability < bindWeight + funcWeight + applyWeight
-        then randomApply contextDepth randomDepth
+        then randomApply contextDepth (randomDepth + 1)
         else if probability < bindWeight + funcWeight + applyWeight + condWeight
-        then randomCond contextDepth randomDepth
+        then randomCond contextDepth (randomDepth + 1)
         else randomSimple contextDepth
 
 -- | Generate a random bind expression.
@@ -272,6 +272,13 @@ randomSimple contextDepth = do
 -- | Generate a random value.
 randomValue :: State.State RobotMutate RobotValue
 randomValue = do
+  valueMaxDepth <-
+    robotParamsRandomValueMaxDepth . robotMutateParams <$> State.get
+  randomValue' valueMaxDepth
+
+-- | Actually generate a random value.
+randomValue' :: Int -> State.State RobotMutate RobotValue
+randomValue' counter = do
   typeValue <- random
   params <- robotMutateParams <$> State.get
   let boolWeight = robotParamsRandomBoolWeight params
@@ -285,11 +292,12 @@ randomValue = do
          in RobotInt <$> (randomR (fromIntegral minInt, fromIntegral maxInt))
     else if typeValue < boolWeight + intWeight + floatWeight
     then RobotFloat <$> (randomR $ robotParamsRandomFloatRange params)
-    else if typeValue < boolWeight + intWeight + floatWeight + vectorWeight
+    else if (typeValue < boolWeight + intWeight + floatWeight + vectorWeight) &&
+            (counter > 0)
     then do
       let maxLength = robotParamsRandomVectorMaxLength params
       lengthValue <- randomR (0, maxLength)
-      RobotVector <$> Seq.replicateM lengthValue randomValue
+      RobotVector <$> Seq.replicateM lengthValue (randomValue' (counter - 1))
     else return RobotNull
 
 -- | Generate a random special constant.

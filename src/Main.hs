@@ -79,10 +79,12 @@ import Data.IORef (IORef,
                    readIORef,
                    writeIORef)
 import System.Random (newStdGen)
-import Data.Foldable (foldl')
+import Data.Foldable (foldl',
+                      toList)
 import GI.GLib (idleAdd,
                 pattern PRIORITY_DEFAULT,
                 pattern PRIORITY_HIGH)
+import GI.Gdk.Objects.Window
 
 -- | The main action.
 main :: IO ()
@@ -172,6 +174,8 @@ setup exprs params savePath = do
         Nothing -> return ()
       return True
 
+  #add window canvas
+  
   gen <- newStdGen
   
   --Gdk.threadsAddIdle PRIORITY_DEFAULT $ #queueDraw canvas >> return True
@@ -215,10 +219,24 @@ handleRobotEvent canvas worldRef (RobotNewRound world) = do
   return RobotContinue
 handleRobotEvent canvas worldRef (RobotWorldCycle world) = do
   writeIORef worldRef (Just world)
-  Gdk.threadsAddIdle PRIORITY_HIGH $ #queueDraw canvas >> return False
+  Gdk.threadsAddIdle PRIORITY_HIGH $ do
+    window <- #getWindow canvas
+    case window of
+      Just window -> #invalidateRect window Nothing True
+      Nothing -> putStr "No window!\n"
+    return False
   threadDelay 10
-  putStr $ printf "Robots: %d Shots: %d\n" (Seq.length $ robotWorldRobots world)
-    (Seq.length $ robotWorldShots world)
+  let robotDisplay =
+        Text.concat
+         (toList (fmap (\robot ->
+                          Text.pack $ printf "%d " (robotIndex robot))
+                   (robotWorldRobots world)))
+      shotDisplay =
+        Text.concat
+         (toList (fmap (\shot ->
+                          Text.pack $ printf "%d " (shotRobotIndex shot))
+                   (robotWorldShots world)))
+  putStr $ printf "Robots: %sShots: %s\n" robotDisplay shotDisplay
   return RobotContinue
 handleRobotEvent canvas worldRef (RobotRoundDone world) = do
   writeIORef worldRef (Just world)

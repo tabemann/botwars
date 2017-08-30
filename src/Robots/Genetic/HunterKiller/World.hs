@@ -53,6 +53,8 @@ import Control.Monad (mapM,
 import Data.Foldable (Foldable,
                       foldl')
 import qualified System.Random as Random
+import System.IO.Unsafe (unsafePerformIO)
+import Text.Printf
 
 -- | Execute a world cycle.
 worldCycle :: State.State RobotWorld RobotCycleState
@@ -90,10 +92,10 @@ collideRobotsAndShots robots shots = do
               return $ (robots |> robot, shots, kills >< robotKills))
     (Seq.empty, shots, Seq.empty) robots
   let robots' = fmap (updateRobotForKills kills) robots
-  State.state (\world -> ((), world { robotWorldRobots = robots',
-                                      robotWorldShots = shots,
-                                      robotWorldKills = robotWorldKills world +
-                                                        Seq.length kills }))
+  State.modify (\world -> world { robotWorldRobots = robots',
+                                  robotWorldShots = shots,
+                                  robotWorldKills = robotWorldKills world +
+                                                    Seq.length kills })
 
 -- | Collide robots with shots.
 collideRobotWithShots :: Robot -> Seq.Seq Shot ->
@@ -146,10 +148,10 @@ respawnRobot robot = do
       program = robotExpr robot
       score = robotScore robot
       gen = robotWorldRandom world
-      (robot, gen') = generateRobot index program (score - 1) gen params
+      (robot', gen') = generateRobot index program (score - 1) gen params
   State.modify $ (\world -> world { robotWorldNextRobotIndex = index + 1,
                                     robotWorldRandom = gen' })
-  return robot
+  return robot'
 
 -- | Generate a robot.
 generateRobot :: Int -> RobotExpr -> Int -> Random.StdGen -> RobotParams ->

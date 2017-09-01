@@ -102,13 +102,14 @@ prepareNextRound world = do
           (exprSize (robotExpr robot0))) (robotWorldRobots world)
       sortedRobots' = Seq.sortBy (\robot0 robot1 -> compare (robotScore robot1)
                                    (robotScore robot0)) sortedRobots
+      programs = fmap robotExpr sortedRobots'
       totalNew = foldl' (+) 0 reproduction
-      sortedRobots'' =
-        Seq.take (Seq.length sortedRobots - totalNew) sortedRobots'
-      programs = fmap robotExpr sortedRobots''
+      (reproduced, nonReproduced) =
+        Seq.splitAt (Seq.length reproduction) (Seq.take (Seq.length programs - (totalNew - Seq.length reproduction))
+                              programs)
       (programs', gen) = foldl' (reproduce params)
-                           (programs, robotWorldRandom world)
-                           (Seq.zip programs reproduction)
+                           (nonReproduced, robotWorldRandom world)
+                           (Seq.zip reproduced reproduction)
   State.modify $ \contState ->
                    contState { robotContPrograms = programs',
                                robotContRandom = robotWorldRandom world }
@@ -177,7 +178,7 @@ setupRobot :: Monad m => RobotExpr -> Int -> State.StateT (RobotCont m) m Robot
 setupRobot program index = do
   params <- robotContParams <$> State.get
   gen <- robotContRandom <$> State.get
-  let (robot, gen') = generateRobot index program 0 gen params
+  let (robot, gen') = generateRobot index program 0.0 gen params
   State.modify $ \contState -> contState { robotContRandom = gen' }
   return robot
   

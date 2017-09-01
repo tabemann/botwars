@@ -85,6 +85,8 @@ defaultParams =
                 robotParamsMaxInitialLocationDeltaAbs = 0.05,
                 robotParamsMinInitialRotationDeltaAbs = 0.0,
                 robotParamsMaxInitialRotationDeltaAbs = pi / 50.0,
+                robotParamsKillScore = 1.0,
+                robotParamsDieScore = -1.0,
                 robotParamsMutationChance = 0.1,
                 robotParamsMutationReplaceLeafChance = 0.25,
                 robotParamsMutationReplaceNodeChance = 0.1,
@@ -107,7 +109,7 @@ defaultParams =
                 robotParamsRandomApplyWeight = 0.2,
                 robotParamsRandomCondWeight = 0.2,
                 robotParamsRandomApplySpecialWeight = 0.75,
-                robotParamsRandomMaxDepth = 4,
+                robotParamsRandomMaxDepth = 3,
                 robotParamsReproduction = Seq.fromList [3, 2, 1],
                 robotParamsSpecialConsts = specialConsts,
                 robotParamsSpecialValueCount = specialValueCount }
@@ -216,6 +218,12 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
   else if name == "maxInitialRotationDeltaAbs"
   then parseLoBoundFloat 0.0 entry $
        \value -> params { robotParamsMaxInitialRotationDeltaAbs = value }
+  else if name == "killScore"
+  then parseFloat entry $
+       \value -> params { robotParamsKillScore = value }
+  else if name == "dieScore"
+  then parseFloat entry $
+       \value -> params { robotParamsDieScore = value }
   else if name == "mutationChance"
   then parseBoundFloat (0.0, 1.0) entry $
        \value -> params { robotParamsMutationChance = value }
@@ -418,7 +426,6 @@ parseConfig =
    ((<|) <$> parseConfigEntry
          <*> (Seq.fromList <$> (Atto.many'
                                 (Atto.skipSpace *>
-                                 "\n" *>
                                  parseConfigEntry)))) <*
   Atto.skipSpace
   
@@ -426,7 +433,7 @@ parseConfig =
 parseConfigEntry :: Atto.Parser RobotConfigEntry
 parseConfigEntry =
   RobotConfigEntry <$> (Atto.skipSpace *>
-                        Atto.takeWhile1 (not . isSpace) <*
+                        Atto.takeWhile1 (\x -> not (isSpace x) && (x /= '=')) <*
                         Atto.skipSpace <*
                         "=")
                    <*> parseConfigValue
@@ -448,4 +455,7 @@ parseConfigVector =
           <*> (Seq.fromList <$> (Atto.many'
                                  (Atto.skipSpace *>
                                   "," *>
-                                  parseConfigValue)))))
+                                  parseConfigValue))))) <*
+  Atto.skipSpace <*
+  "]" <*
+  Atto.skipSpace

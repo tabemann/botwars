@@ -85,13 +85,14 @@ worldCycle = do
 collideRobotsAndShots :: Seq.Seq Robot -> Seq.Seq Shot ->
                          State.State RobotWorld ()
 collideRobotsAndShots robots shots = do
+  params <- robotWorldParams <$> State.get
   (robots, shots, kills) <-
     foldM (\(robots, shots, kills) robot -> do
               (robot, shots, robotKills) <-
                 collideRobotWithShots robot shots
               return $ (robots |> robot, shots, kills >< robotKills))
     (Seq.empty, shots, Seq.empty) robots
-  let robots' = fmap (updateRobotForKills kills) robots
+  let robots' = fmap (updateRobotForKills kills params) robots
   State.modify (\world -> world { robotWorldRobots = robots',
                                   robotWorldShots = shots,
                                   robotWorldKills = robotWorldKills world +
@@ -107,10 +108,11 @@ collideRobotWithShots robot shots = do
         Seq.partition
           (\shot ->
              if robotIndex robot /= shotRobotIndex shot
-             then let relativeLocation =
-                        subVector (shotLocation shot) (robotLocation robot)
-                      distance = absVector relativeLocation
-                  in distance < robotParamsRobotRadius params
+             then --let relativeLocation =
+                      --  subVector (shotLocation shot) (robotLocation robot)
+                      --distance = absVector relativeLocation
+                  --in distance < robotParamsRobotRadius params
+               didShotHitRobot robot shot (robotParamsRobotRadius params)
              else False)
           shots
       shotHarm =
@@ -139,6 +141,19 @@ collideRobotWithShots robot shots = do
       robot <- respawnRobot robot
       return (robot, shotsThatDidNotHit, fmap shotRobotIndex shotsThatHit)
 
+-- | Get whether shot hit robot.
+didShotHitRobot :: Robot -> Shot -> Double -> Bool
+didShotHitRobot robot shot radius =
+  let relativeLocation0 =
+        subVector (robotLocation robot) (shotLocation shot)
+      relativeLocation1 =
+        subVector (robotLocation robot)
+          (addVector (shotLocation shot) (shotLocationDelta shot))
+      distance0 = absVector relativeLocation0
+      distance1 = absVector relativeLocation1
+      distance = absVector (shotLocationDelta shot)
+  in ((distance0 + distance1) - distance) < (radius * 2)
+
 -- | Respawn a robot
 respawnRobot :: Robot -> State.State RobotWorld Robot
 respawnRobot robot = do
@@ -146,15 +161,15 @@ respawnRobot robot = do
   let params = robotWorldParams world
       index = robotWorldNextRobotIndex world
       program = robotExpr robot
-      score = robotScore robot
+      score = robotScore robot + robotParamsDieScore params
       gen = robotWorldRandom world
-      (robot', gen') = generateRobot index program (score - 1) gen params
+      (robot', gen') = generateRobot index program score gen params
   State.modify $ (\world -> world { robotWorldNextRobotIndex = index + 1,
                                     robotWorldRandom = gen' })
   return robot'
 
 -- | Generate a robot.
-generateRobot :: Int -> RobotExpr -> Int -> Random.StdGen -> RobotParams ->
+generateRobot :: Int -> RobotExpr -> Double -> Random.StdGen -> RobotParams ->
                  (Robot, Random.StdGen)
 generateRobot index program score gen params = 
   let (generalEnergy, gen') =
@@ -195,10 +210,11 @@ generateRobot index program score gen params =
        gen''''''''')
 
 -- | Update robots for kills.
-updateRobotForKills :: Seq.Seq Int -> Robot -> Robot
-updateRobotForKills kills robot =
+updateRobotForKills :: Seq.Seq Int -> RobotParams -> Robot -> Robot
+updateRobotForKills kills params robot =
   foldl' (\robot kill -> if kill == robotIndex robot
-                         then robot { robotScore = robotScore robot + 1 }
+                         then robot { robotScore = robotScore robot +
+                                                   robotParamsKillScore params }
                          else robot)
     robot kills
 

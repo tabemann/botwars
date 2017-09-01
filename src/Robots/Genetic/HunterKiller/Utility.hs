@@ -58,10 +58,7 @@ import Data.Char (isControl)
 
 -- | Prep text.
 prepText :: Text.Text -> Text.Text
-prepText = removeComments . convertCR . removeControl
-
--- | Remove control characters from text.
-removeControl = Text.intercalate " " . Text.split isControl
+prepText = removeComments . convertCR
 
 -- | Convert CR in text.
 convertCR :: Text.Text -> Text.Text

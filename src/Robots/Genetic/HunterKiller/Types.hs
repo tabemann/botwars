@@ -112,6 +112,8 @@ data RobotParams =
                 robotParamsMaxInitialLocationDeltaAbs :: Double,
                 robotParamsMinInitialRotationDeltaAbs :: Double,
                 robotParamsMaxInitialRotationDeltaAbs :: Double,
+                robotParamsKillScore :: Double,
+                robotParamsDieScore :: Double,
                 robotParamsMutationChance :: Double,
                 robotParamsMutationReplaceLeafChance :: Double,
                 robotParamsMutationReplaceNodeChance :: Double,
@@ -160,7 +162,7 @@ data Robot =
           robotGeneralEnergy :: Double,
           robotWeaponEnergy :: Double,
           robotHealth :: Double,
-          robotScore :: Int }
+          robotScore :: Double }
 
 -- | Shot type
 data Shot =

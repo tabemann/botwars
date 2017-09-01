@@ -165,7 +165,6 @@ setup exprs params savePath = do
   on canvas #draw $ \(Context fp) -> do
     withManagedPtr fp $ \p ->
       (`runReaderT` Cairo (castPtr p)) $ runRender $ do
-      liftIO $ putStr "rendering\n"
       w <- liftIO $ fromIntegral <$> Gtk.widgetGetAllocatedWidth canvas
       h <- liftIO $ fromIntegral <$> Gtk.widgetGetAllocatedHeight canvas
       world <- liftIO $ readIORef worldRef
@@ -178,8 +177,6 @@ setup exprs params savePath = do
   
   gen <- newStdGen
   
-  --Gdk.threadsAddIdle PRIORITY_DEFAULT $ #queueDraw canvas >> return True
-
   #showAll window
 
   forkOS Gtk.main
@@ -223,7 +220,7 @@ handleRobotEvent canvas worldRef (RobotWorldCycle world) = do
     window <- #getWindow canvas
     case window of
       Just window -> #invalidateRect window Nothing True
-      Nothing -> putStr "No window!\n"
+      Nothing -> return ()
     return False
   threadDelay 10
   let robotDisplay =

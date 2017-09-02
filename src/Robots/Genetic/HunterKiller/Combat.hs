@@ -145,7 +145,7 @@ valueSize (RobotOutput value _) = 1 + valueSize value
 reproduce :: RobotParams -> (Seq.Seq RobotExpr, Random.StdGen) ->
              (RobotExpr, Int) -> (Seq.Seq RobotExpr, Random.StdGen)
 reproduce params (programs, gen) (program, count) =
-  if count > 0
+  if count > 1
   then let (newProgram, mutateState) =
              State.runState (mutate startingContextDepth program)
                (RobotMutate { robotMutateRandom = gen,
@@ -153,6 +153,8 @@ reproduce params (programs, gen) (program, count) =
        in reproduce params
             (programs |> newProgram, robotMutateRandom mutateState)
             (program, count - 1)
+  else if count == 1
+  then (programs |> program, gen)
   else (programs, gen)
 
 -- | Set up a world.

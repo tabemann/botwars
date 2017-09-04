@@ -113,6 +113,7 @@ data RobotParams =
                 robotParamsMinInitialRotationDeltaAbs :: Double,
                 robotParamsMaxInitialRotationDeltaAbs :: Double,
                 robotParamsKillScore :: Double,
+                robotParamsHitScoreFactor :: Double,
                 robotParamsDieScore :: Double,
                 robotParamsMutationChance :: Double,
                 robotParamsMutationReplaceLeafChance :: Double,

@@ -86,6 +86,7 @@ defaultParams =
                 robotParamsMinInitialRotationDeltaAbs = 0.0,
                 robotParamsMaxInitialRotationDeltaAbs = pi / 50.0,
                 robotParamsKillScore = 1.0,
+                robotParamsHitScoreFactor = 0.75,
                 robotParamsDieScore = -1.0,
                 robotParamsMutationChance = 0.1,
                 robotParamsMutationReplaceLeafChance = 0.25,
@@ -221,6 +222,9 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
   else if name == "killScore"
   then parseFloat entry $
        \value -> params { robotParamsKillScore = value }
+  else if name == "hitScoreFactor"
+  then parseFloat entry $
+       \value -> params { robotParamsHitScoreFactor = value }
   else if name == "dieScore"
   then parseFloat entry $
        \value -> params { robotParamsDieScore = value }

@@ -68,7 +68,7 @@ drawShot w h params shot = do
   let (x, y) = convertCoord (shotLocation shot) w h
   Cairo.moveTo x y
   let (endX, endY) = convertCoord (addVector (shotLocation shot)
-                                   (mulVector 3.0 (shotLocationDelta shot)))
+                                   (shotLocationDelta shot))
                      w h
   Cairo.lineTo endX endY
   Cairo.stroke

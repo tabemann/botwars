@@ -158,7 +158,7 @@ setup exprs params savePath = do
 
   canvas <- new Gtk.DrawingArea []
 
-  #setSizeRequest canvas 512 512
+  #setSizeRequest canvas 920 920
 
   worldRef <- newIORef Nothing
   

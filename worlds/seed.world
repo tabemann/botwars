@@ -1,0 +1,35 @@
+world
+ {
+  apply with
+   {
+    apply with
+     {
+      apply with
+       {
+        const null,
+	const float 0.01
+       }
+      for
+       (special turn),
+      const float 0.01
+     }
+    for
+     (special thrust),
+    if
+     (
+      apply with
+       {
+        load 5,
+	const float 1.0
+       }
+      for
+       (special gte)
+     )
+    then
+     (const float 1.0)
+    else
+     (const float 0.0)
+   }
+  for
+   (special fire)
+ }

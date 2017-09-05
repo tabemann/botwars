@@ -88,6 +88,7 @@ data RobotParams =
                 robotParamsTurnFactor :: Double,
                 robotParamsShotSpeed :: Double,
                 robotParamsShotEnergyDecay :: Double,
+                robotParamsShotMinFireEnergy :: Double,
                 robotParamsShotMinEnergy :: Double,
                 robotParamsRobotRadius :: Double,
                 robotParamsMaxCycles :: Int,

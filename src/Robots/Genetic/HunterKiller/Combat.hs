@@ -50,13 +50,14 @@ import Data.Foldable (foldlM,
 
 -- | Execute robot combat.
 combat :: Monad m => (RobotEvent -> m RobotInput) -> Seq.Seq RobotExpr ->
-          RobotParams -> Random.StdGen -> m Random.StdGen
-combat func programs params gen =
-  robotContRandom <$> State.execStateT executeRounds
+          RobotParams -> Random.StdGen -> m (Seq.Seq RobotExpr, Random.StdGen)
+combat func programs params gen = do
+  cont <- State.execStateT executeRounds
     (RobotCont { robotContParams = params,
                  robotContRandom = gen,
                  robotContPrograms = programs,
                  robotContEventHandler = func })
+  return (robotContPrograms cont, robotContRandom cont)
 
 -- | Execute rounds of combat.
 executeRounds :: Monad m => State.StateT (RobotCont m) m ()

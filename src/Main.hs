@@ -154,7 +154,9 @@ setup exprs params savePath = do
   window <- new Gtk.Window [ #title := "Botwars",
                              #borderWidth := 10 ]
 
-  on window #destroy $ putMVar exit ExitSuccess
+  on window #destroy $ do
+    Gtk.mainQuit
+    putMVar exit ExitSuccess
 
   canvas <- new Gtk.DrawingArea []
 

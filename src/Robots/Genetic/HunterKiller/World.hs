@@ -70,9 +70,9 @@ worldCycle = do
         cycleEndStates
       robots = fmap fst updatedRobotsAndShots
       newShots = collectJust . fmap snd $ updatedRobotsAndShots
-      shots = robotWorldShots world >< newShots
-      updatedShots = collectJust $ fmap (\shot -> updateShot shot params) shots
-  collideRobotsAndShots robots updatedShots
+      updatedShots = collectJust $ fmap (\shot -> updateShot shot params)
+                     (robotWorldShots world)
+  collideRobotsAndShots robots (updatedShots >< newShots)
   State.modify $ \world ->
                    world { robotWorldCycles = robotWorldCycles world + 1 }
   world <- State.get
@@ -265,7 +265,10 @@ updateRobot robot stateData action params =
            robotParamsThrustFactor params)
       location = wrap $ addVector (robotLocation robot) locationDelta'
       firePower = min weaponEnergy . max 0.0 $ robotActionFirePower action
-      weaponEnergy' = weaponEnergy - firePower
+      firePower' = if firePower < robotParamsShotMinFireEnergy params
+                   then 0.0
+                   else firePower
+      weaponEnergy' = weaponEnergy - firePower'
       robot' = robot { robotData = stateData,
                        robotLocation = location,
                        robotLocationDelta = locationDelta',
@@ -274,8 +277,8 @@ updateRobot robot stateData action params =
                        robotGeneralEnergy = generalEnergy'',
                        robotWeaponEnergy = weaponEnergy',
                        robotHealth = health }
-      shot = if firePower > 0.0
-             then Just $ fireShot robot' firePower params
+      shot = if firePower' > 0.0
+             then Just $ fireShot robot' firePower' params
              else Nothing
   in (robot', shot)
 

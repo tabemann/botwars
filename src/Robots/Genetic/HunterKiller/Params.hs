@@ -59,9 +59,10 @@ defaultParams =
                 robotParamsFireFactor = 2.0,
                 robotParamsThrustFactor = 0.1,
                 robotParamsTurnFactor = pi / 50.0,
-                robotParamsShotSpeed = 0.01 ,
+                robotParamsShotSpeed = 0.01,
                 robotParamsShotEnergyDecay = 0.01,
-                robotParamsShotMinEnergy = 0.05,
+                robotParamsShotMinFireEnergy = 0.05,
+                robotParamsShotMinEnergy = 0.0125,
                 robotParamsRobotRadius = 0.01,
                 robotParamsMaxCycles = 10000,
                 robotParamsMaxKills = 100,
@@ -147,6 +148,9 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
   else if name == "shotEnergyDecay"
   then parseBoundFloat (0.0, 1.0) entry $
        \value -> params { robotParamsShotEnergyDecay = value }
+  else if name == "shotMinFireEnergy"
+  then parseLoBoundFloat 0.0 entry $
+       \value -> params { robotParamsShotMinFireEnergy = value }
   else if name == "shotMinEnergy"
   then parseLoBoundFloat 0.0 entry $
        \value -> params { robotParamsShotMinEnergy = value }

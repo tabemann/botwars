@@ -111,10 +111,7 @@ collideRobotWithShots robot shots = do
         Seq.partition
           (\shot ->
              if robotIndex robot /= shotRobotIndex shot
-             then --let relativeLocation =
-                      --  subVector (shotLocation shot) (robotLocation robot)
-                      --distance = absVector relativeLocation
-                  --in distance < robotParamsRobotRadius params
+             then
                didShotHitRobot robot shot (robotParamsRobotRadius params)
              else False)
           shots
@@ -136,10 +133,14 @@ collideRobotWithShots robot shots = do
                  in (shot, shotEnergy shot * factor *
                       robotParamsShotHarmFactor params))
           shotsThatHit
-      shotHarm = sum $ fmap snd shotsWithHarm
+      shotHarm = max 0.0 (sum $ fmap snd shotsWithHarm)
       health = robotHealth robot - shotHarm
   if health > 0.0
-    then return $ (robot { robotHealth = health }, shotsThatDidNotHit,
+    then return $ (robot { robotHealth = health,
+                           robotScore = robotScore robot +
+                             (shotHarm *
+                              robotParamsDamagedScoreFactor params) },
+                   shotsThatDidNotHit,
                    shotsWithHarm, Seq.empty)
     else do
       robot <- respawnRobot robot
@@ -276,7 +277,12 @@ updateRobot robot stateData action params =
                        robotRotationDelta = rotationDelta',
                        robotGeneralEnergy = generalEnergy'',
                        robotWeaponEnergy = weaponEnergy',
-                       robotHealth = health }
+                       robotHealth = health,
+                       robotScore = robotScore robot +
+                                    (thrustPower *
+                                     robotParamsThrustScoreFactor params) +
+                                    (turnPower *
+                                     robotParamsTurnScoreFactor params) }
       shot = if firePower' > 0.0
              then Just $ fireShot robot' firePower' params
              else Nothing

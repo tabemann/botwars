@@ -92,11 +92,16 @@ mutateSub contextDepth (RobotCond condExpr trueExpr falseExpr) = do
 -- | Directly mutate an expression.
 mutateDirect :: Int -> RobotExpr -> State.State RobotMutate RobotExpr
 mutateDirect contextDepth expr = do
-  case expr of
-    RobotLoad _ -> mutateLeaf contextDepth expr
-    RobotConst _ -> mutateLeaf contextDepth expr
-    RobotSpecialConst _ -> mutateLeaf contextDepth expr
-    _ -> mutateNode contextDepth expr
+  probability <- random
+  insertCondChance <-
+    robotParamsMutationInsertCondChance <$> robotMutateParams <$> State.get
+  if probability <= insertCondChance
+    then insertCond contextDepth expr
+    else case expr of
+           RobotLoad _ -> mutateLeaf contextDepth expr
+           RobotConst _ -> mutateLeaf contextDepth expr
+           RobotSpecialConst _ -> mutateLeaf contextDepth expr
+           _ -> mutateNode contextDepth expr
 
 -- | Directly mutate a leaf expression.
 mutateLeaf :: Int -> RobotExpr -> State.State RobotMutate RobotExpr
@@ -317,3 +322,16 @@ randomIntrinsic = do
   let constsLength = Seq.length $ robotParamsSpecialConsts params
   RobotSpecialConst <$> randomR (robotParamsSpecialValueCount params,
                                   constsLength - 1)
+
+-- | Insert a cond instruction.
+insertCond :: Int -> RobotExpr -> State.State RobotMutate RobotExpr
+insertCond contextDepth expr = do
+  probability <- random
+  insertCondAsTrueChance <-
+    robotParamsMutationInsertCondAsTrueChance <$> robotMutateParams <$>
+    State.get
+  condExpr <- randomExpr contextDepth
+  otherExpr <- randomExpr contextDepth
+  if probability <= insertCondAsTrueChance
+    then return $ RobotCond condExpr expr otherExpr
+    else return $ RobotCond condExpr otherExpr expr

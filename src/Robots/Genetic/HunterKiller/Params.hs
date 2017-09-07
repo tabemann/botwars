@@ -89,9 +89,14 @@ defaultParams =
                 robotParamsKillScore = 1.0,
                 robotParamsHitScoreFactor = 0.75,
                 robotParamsDieScore = -1.0,
+                robotParamsDamagedScoreFactor = -0.75,
+                robotParamsThrustScoreFactor = 0.025,
+                robotParamsTurnScoreFactor = 0.025,
                 robotParamsMutationChance = 0.1,
                 robotParamsMutationReplaceLeafChance = 0.25,
                 robotParamsMutationReplaceNodeChance = 0.1,
+                robotParamsMutationInsertCondChance = 0.001,
+                robotParamsMutationInsertCondAsTrueChance = 0.75,
                 robotParamsRandomBoolWeight = 0.2,
                 robotParamsRandomIntWeight = 0.2,
                 robotParamsRandomFloatWeight = 0.4,
@@ -232,6 +237,15 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
   else if name == "dieScore"
   then parseFloat entry $
        \value -> params { robotParamsDieScore = value }
+  else if name == "damagedScoreFactor"
+  then parseFloat entry $
+       \value -> params { robotParamsDamagedScoreFactor = value }
+  else if name == "thrustScoreFactor"
+  then parseFloat entry $
+       \value -> params { robotParamsThrustScoreFactor = value }
+  else if name == "turnScoreFactor"
+  then parseFloat entry $
+       \value -> params { robotParamsTurnScoreFactor = value }
   else if name == "mutationChance"
   then parseBoundFloat (0.0, 1.0) entry $
        \value -> params { robotParamsMutationChance = value }
@@ -241,6 +255,12 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
   else if name == "mutationReplaceNodeChance"
   then parseBoundFloat (0.0, 1.0) entry $
        \value -> params { robotParamsMutationReplaceNodeChance = value }
+  else if name == "mutationInsertCondChance"
+  then parseBoundFloat (0.0, 1.0) entry $
+       \value -> params { robotParamsMutationInsertCondChance = value }
+  else if name == "mutationInsertCondAsTrueChance"
+  then parseBoundFloat (0.0, 1.0) entry $
+       \value -> params { robotParamsMutationInsertCondAsTrueChance = value }
   else if name == "randomBoolWeight"
   then parseFloat entry $
        \value -> params { robotParamsRandomBoolWeight = value }

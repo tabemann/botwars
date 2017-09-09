@@ -124,6 +124,7 @@ data RobotParams =
                 robotParamsMutationReplaceNodeChance :: Double,
                 robotParamsMutationInsertCondChance :: Double,
                 robotParamsMutationInsertCondAsTrueChance :: Double,
+                robotParamsMutationInsertBindChance :: Double,
                 robotParamsRandomBoolWeight :: Double,
                 robotParamsRandomIntWeight :: Double,
                 robotParamsRandomFloatWeight :: Double,

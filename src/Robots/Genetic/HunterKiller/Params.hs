@@ -68,7 +68,7 @@ defaultParams =
                 robotParamsMaxKills = 100,
                 robotParamsMaxDepth = 1000,
                 robotParamsMaxInstrCount = 5000,
-                robotParamsViewAngle = pi / (2.0 / 3.0),
+                robotParamsViewAngle = pi / 3.0,
                 robotParamsViewDistance = 0.65,
                 robotParamsViewSortAngleFactor = 0.4,
                 robotParamsViewSortDistanceFactor = 0.6,
@@ -97,6 +97,7 @@ defaultParams =
                 robotParamsMutationReplaceNodeChance = 0.1,
                 robotParamsMutationInsertCondChance = 0.001,
                 robotParamsMutationInsertCondAsTrueChance = 0.75,
+                robotParamsMutationInsertBindChance = 0.005,
                 robotParamsRandomBoolWeight = 0.2,
                 robotParamsRandomIntWeight = 0.2,
                 robotParamsRandomFloatWeight = 0.4,
@@ -261,6 +262,9 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
   else if name == "mutationInsertCondAsTrueChance"
   then parseBoundFloat (0.0, 1.0) entry $
        \value -> params { robotParamsMutationInsertCondAsTrueChance = value }
+  else if name == "mutationInsertBindChance"
+  then parseBoundFloat (0.0, 1.0) entry $
+       \value -> params { robotParamsMutationInsertBindChance = value }
   else if name == "randomBoolWeight"
   then parseFloat entry $
        \value -> params { robotParamsRandomBoolWeight = value }

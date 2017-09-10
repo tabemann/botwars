@@ -38,7 +38,8 @@ import Robots.Genetic.HunterKiller.World
 import Robots.Genetic.HunterKiller.Mutate
 import Control.Monad.State.Strict as State
 import Data.Sequence as Seq
-import Data.Sequence ((|>))
+import Data.Sequence ((<|),
+                      (|>))
 import Data.Functor ((<$>),
                      fmap)
 import System.Random as Random
@@ -56,7 +57,7 @@ combat func programs params gen = do
     (RobotCont { robotContParams = params,
                  robotContRandom = gen,
                  robotContPrograms = programs,
-                 robotContSavedWorld = Nothing,
+                 robotContSavedWorlds = Seq.empty,
                  robotContEventHandler = func })
   return (robotContPrograms cont, robotContRandom cont)
 
@@ -74,16 +75,35 @@ executeRounds = do
           input <- lift . eventHandler $ RobotRoundDone world'
           case input of
             RobotContinue -> do
+              savedWorlds <- robotContSavedWorlds <$> State.get
               minKills <- robotParamsMinKills . robotContParams <$> State.get
               if robotWorldKills world' >= minKills
-                then prepareNextRound world'
-                else do
-                  savedWorld <- robotContSavedWorld <$> State.get
-                  case savedWorld of
-                    Just savedWorld -> prepareNextRound savedWorld
-                    Nothing -> do
-                      newWorld <- setupWorld
-                      prepareNextRound newWorld
+                then do
+                  savedWorldCount <-
+                    robotParamsSavedWorldCount . robotContParams <$> State.get
+                  State.modify $ \contState ->
+                    contState { robotContSavedWorlds =
+                                  Seq.take savedWorldCount
+                                    (world' <| savedWorlds) }
+                  prepareNextRound world'
+                else
+                  case Seq.lookup 1 savedWorlds of
+                    Just savedWorld -> do
+                      State.modify $ \contState ->
+                        contState { robotContSavedWorlds =
+                                      Seq.drop 1 savedWorlds }
+                      prepareNextRound savedWorld
+                    Nothing ->
+                      case Seq.lookup 0 savedWorlds of
+                        Just savedWorld -> do
+                          State.modify $ \contState ->
+                            contState { robotContSavedWorlds = Seq.empty }
+                          prepareNextRound savedWorld
+                        Nothing -> do
+                          State.modify $ \contState ->
+                            contState { robotContSavedWorlds = Seq.empty }
+                          newWorld <- setupWorld
+                          prepareNextRound newWorld
               executeRounds
             RobotExit -> return ()
         RobotExit -> return ()
@@ -123,7 +143,6 @@ prepareNextRound world = do
                            (Seq.zip reproduced reproduction)
   State.modify $ \contState ->
                    contState { robotContPrograms = programs',
-                               robotContSavedWorld = Just world,
                                robotContRandom = robotWorldRandom world }
 
 -- | Get the "size" of an expression.

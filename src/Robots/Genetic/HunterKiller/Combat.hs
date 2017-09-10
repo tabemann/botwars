@@ -56,6 +56,7 @@ combat func programs params gen = do
     (RobotCont { robotContParams = params,
                  robotContRandom = gen,
                  robotContPrograms = programs,
+                 robotContSavedWorld = Nothing,
                  robotContEventHandler = func })
   return (robotContPrograms cont, robotContRandom cont)
 
@@ -73,7 +74,16 @@ executeRounds = do
           input <- lift . eventHandler $ RobotRoundDone world'
           case input of
             RobotContinue -> do
-              prepareNextRound world'
+              minKills <- robotParamsMinKills . robotContParams <$> State.get
+              if robotWorldKills world' >= minKills
+                then prepareNextRound world'
+                else do
+                  savedWorld <- robotContSavedWorld <$> State.get
+                  case savedWorld of
+                    Just savedWorld -> prepareNextRound savedWorld
+                    Nothing -> do
+                      newWorld <- setupWorld
+                      prepareNextRound newWorld
               executeRounds
             RobotExit -> return ()
         RobotExit -> return ()
@@ -113,6 +123,7 @@ prepareNextRound world = do
                            (Seq.zip reproduced reproduction)
   State.modify $ \contState ->
                    contState { robotContPrograms = programs',
+                               robotContSavedWorld = Just world,
                                robotContRandom = robotWorldRandom world }
 
 -- | Get the "size" of an expression.

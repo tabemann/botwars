@@ -62,6 +62,7 @@ data RobotCont m =
   RobotCont { robotContParams :: RobotParams,
               robotContRandom :: Random.StdGen,
               robotContPrograms :: Seq.Seq RobotExpr,
+              robotContSavedWorld :: Maybe RobotWorld,
               robotContEventHandler :: RobotEvent -> m RobotInput }
 
 -- | Robot world type
@@ -94,6 +95,7 @@ data RobotParams =
                 robotParamsMaxCycles :: Int,
                 robotParamsMaxKills :: Int,
                 robotParamsMaxDepth :: Int,
+                robotParamsMinKills :: Int,
                 robotParamsMaxInstrCount :: Int,
                 robotParamsViewAngle :: Double,
                 robotParamsViewDistance :: Double,

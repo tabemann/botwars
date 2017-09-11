@@ -96,12 +96,8 @@ executeRounds = do
                     Nothing ->
                       case Seq.lookup 0 savedWorlds of
                         Just savedWorld -> do
-                          State.modify $ \contState ->
-                            contState { robotContSavedWorlds = Seq.empty }
                           prepareNextRound savedWorld
                         Nothing -> do
-                          State.modify $ \contState ->
-                            contState { robotContSavedWorlds = Seq.empty }
                           newWorld <- setupWorld
                           prepareNextRound newWorld
               executeRounds

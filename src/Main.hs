@@ -184,7 +184,7 @@ setup exprs params savePath = do
   forkOS Gtk.main
 
   forkIO $ do
-    catch (combat (handleRobotEvent canvas worldRef) exprs params gen >> return ())
+    catch (combat (handleRobotEvent savePath canvas worldRef) exprs params gen >> return ())
       (\e -> putStr . printf "%s\n" $ show (e :: SomeException))
     putStr "Exited\n"
     return ()
@@ -194,13 +194,9 @@ setup exprs params savePath = do
   world <- readIORef worldRef
   case world of
     Just world -> do
-      let worldText = saveWorld specialConstEntries (fmap robotExpr (robotWorldRobots world))
-      saveFile <- catch (Right <$> openFile savePath WriteMode)
-                  (\e -> return . Left . Text.pack $ show (e :: IOException))
-      case saveFile of
-        Right saveFile -> do
-          TextIO.hPutStr saveFile worldText
-          hClose saveFile
+      status <- saveWorldToFile savePath world
+      case status of
+        Right () -> return ()
         Left errorText -> do
           TextIO.hPutStr stderr errorText
           exitFailure
@@ -208,15 +204,29 @@ setup exprs params savePath = do
 
   exitWith exitStatus
 
+-- | Save a world.
+saveWorldToFile :: FilePath -> RobotWorld -> IO (Either Text.Text ())
+saveWorldToFile path world = do
+  let worldText =
+        saveWorld specialConstEntries (fmap robotExpr (robotWorldRobots world))
+  saveFile <- catch (Right <$> openFile path WriteMode)
+              (\e -> return . Left . Text.pack $ show (e :: IOException))
+  case saveFile of
+    Right saveFile -> do
+      TextIO.hPutStr saveFile worldText
+      hClose saveFile
+      return $ Right ()
+    Left errorText -> do
+      return $ Left errorText
+      
 -- | Handle a robot event.
-handleRobotEvent :: Gtk.DrawingArea -> IORef (Maybe RobotWorld) ->
+handleRobotEvent :: FilePath -> Gtk.DrawingArea -> IORef (Maybe RobotWorld) ->
                     RobotEvent -> IO RobotInput
-handleRobotEvent canvas worldRef (RobotNewRound world) = do
+handleRobotEvent path canvas worldRef (RobotNewRound world) = do
   writeIORef worldRef (Just world)
---  Gdk.threadsAddIdle PRIORITY_HIGH $ #queueDraw canvas >> return False
   putStr "RobotNewRound\n"
   return RobotContinue
-handleRobotEvent canvas worldRef (RobotWorldCycle world) = do
+handleRobotEvent path canvas worldRef (RobotWorldCycle world) = do
   writeIORef worldRef (Just world)
   Gdk.threadsAddIdle PRIORITY_HIGH $ do
     window <- #getWindow canvas
@@ -237,8 +247,13 @@ handleRobotEvent canvas worldRef (RobotWorldCycle world) = do
                    (robotWorldShots world)))
   putStr $ printf "Robots: %sShots: %s\n" robotDisplay shotDisplay
   return RobotContinue
-handleRobotEvent canvas worldRef (RobotRoundDone world) = do
+handleRobotEvent path canvas worldRef (RobotRoundDone world) = do
   writeIORef worldRef (Just world)
---  Gdk.threadsAddIdle PRIORITY_HIGH $ #queueDraw canvas >> return False
   putStr "RobotRoundDone\n"
+  status <- saveWorldToFile (path ++ ".prev") world
+  case status of
+    Right () -> return ()
+    Left errorText -> do
+      TextIO.hPutStr stderr errorText
+      return ()
   return RobotContinue

@@ -80,7 +80,7 @@ executeRounds = do
               if robotWorldKills world' >= minKills
                 then do
                   savedWorldCount <-
-                    robotParamsSavedWorldCount . robotContParams <$> State.get
+                    robotParamsSavedWorldCount <$> robotContParams <$> State.get
                   State.modify $ \contState ->
                     contState { robotContSavedWorlds =
                                   Seq.take savedWorldCount
@@ -89,17 +89,25 @@ executeRounds = do
                 else
                   case Seq.lookup 1 savedWorlds of
                     Just savedWorld -> do
+                      let savedWorld' =
+                            savedWorld { robotWorldRandom =
+                                           robotWorldRandom world' }
                       State.modify $ \contState ->
                         contState { robotContSavedWorlds =
                                       Seq.drop 1 savedWorlds }
-                      prepareNextRound savedWorld
+                      prepareNextRound savedWorld'
                     Nothing ->
                       case Seq.lookup 0 savedWorlds of
                         Just savedWorld -> do
-                          prepareNextRound savedWorld
+                          let savedWorld' =
+                                savedWorld { robotWorldRandom =
+                                               robotWorldRandom world' }
+                          prepareNextRound savedWorld'
                         Nothing -> do
-                          newWorld <- setupWorld
-                          prepareNextRound newWorld
+                          let world'' =
+                                world { robotWorldRandom =
+                                          robotWorldRandom world' }
+                          prepareNextRound world''
               executeRounds
             RobotExit -> return ()
         RobotExit -> return ()

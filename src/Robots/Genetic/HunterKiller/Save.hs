@@ -40,82 +40,83 @@ import Robots.Genetic.HunterKiller.Types
 import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import Text.Printf (printf)
-import Data.Foldable (foldl')
+import Data.Foldable (foldl',
+                      toList)
+import Data.Sequence ((><),
+                      (<|),
+                      (|>))
 
 -- | Save a robot world as text.
 saveWorld :: Seq.Seq RobotConstEntry -> Seq.Seq RobotExpr -> Text.Text
 saveWorld consts exprs =
-  Text.intercalate "\n" ["world", outputExprs consts 1 1 exprs]
+  Text.concat . toList $ "world\n" <| outputExprs consts 1 1 exprs
 
 -- | Save a robot program as text.
 save :: Seq.Seq RobotConstEntry -> RobotExpr -> Text.Text
-save consts expr = outputExpr consts 0 0 expr
+save consts expr = Text.concat . toList $ outputExpr consts 0 0 expr
 
 -- | Actually output a robot program as text.
-outputExpr :: Seq.Seq RobotConstEntry -> Int -> Int -> RobotExpr -> Text.Text
+outputExpr :: Seq.Seq RobotConstEntry -> Int -> Int -> RobotExpr ->
+  Seq.Seq Text.Text
 outputExpr _ firstIndent _ (RobotLoad index) =
-  indentText firstIndent . Text.pack $ printf "load %i" index
+  indentText firstIndent . Seq.singleton . Text.pack $ printf "load %i" index
 outputExpr _ firstIndent nextIndex (RobotConst value) =
   let valueText = outputValue 0 (nextIndex + Text.length "const ") value
-  in indentText firstIndent . Text.pack $
-       printf "const %s" valueText
+  in indentText firstIndent $ "const " <| valueText
 outputExpr consts firstIndent _ (RobotSpecialConst index) =
   case Seq.lookup index consts of
     Just (RobotConstEntry _ name) ->
-      indentText firstIndent $ Text.append "special " name
+      indentText firstIndent $ Seq.fromList ["special ", name]
     Nothing -> error "this should be impossible"
 outputExpr consts firstIndex nextIndex (RobotBind boundExprs expr) =
-  Text.intercalate "\n"
-    [indentText firstIndex "bind",
-     outputExprs consts (nextIndex + 1) (nextIndex + 1) boundExprs,
-     indentText nextIndex "in",
-     outputParenExpr consts (nextIndex + 1) (nextIndex + 1) expr]
+  indentText firstIndex (Seq.singleton "bind\n") ><
+  outputExprs consts (nextIndex + 1) (nextIndex + 1) boundExprs ><
+  Seq.singleton "\n" >< indentText nextIndex (Seq.singleton "in\n") ><
+  outputParenExpr consts (nextIndex + 1) (nextIndex + 1) expr
 outputExpr consts firstIndex nextIndex (RobotFunc argCount expr) =
-  Text.intercalate "\n"
-    [indentText firstIndex . Text.pack $ printf "func %i as" argCount,
-     outputParenExpr consts (nextIndex + 1) (nextIndex + 1) expr]
+  (indentText firstIndex . Seq.singleton . Text.pack $
+    printf "func %i as\n" argCount) ><
+  outputParenExpr consts (nextIndex + 1) (nextIndex + 1) expr
 outputExpr consts firstIndex nextIndex (RobotApply argExprs funcExpr) =
-  Text.intercalate "\n"
-    [indentText firstIndex "apply with",
-     outputExprs consts (nextIndex + 1) (nextIndex + 1) argExprs,
-     indentText nextIndex "for",
-     outputParenExpr consts (nextIndex + 1) (nextIndex + 1) funcExpr]
+  indentText firstIndex (Seq.singleton "apply with\n") ><
+  outputExprs consts (nextIndex + 1) (nextIndex + 1) argExprs ><
+  Seq.singleton "\n" >< indentText nextIndex (Seq.singleton "for\n") ><
+  outputParenExpr consts (nextIndex + 1) (nextIndex + 1) funcExpr
 outputExpr consts firstIndex nextIndex (RobotCond condExpr trueExpr falseExpr) =
-  Text.intercalate "\n"
-    [indentText firstIndex "if",
-     outputParenExpr consts (nextIndex + 1) (nextIndex + 1) condExpr,
-     indentText nextIndex "then",
-     outputParenExpr consts (nextIndex + 1) (nextIndex + 1) trueExpr,
-     indentText nextIndex "else",
-     outputParenExpr consts (nextIndex + 1) (nextIndex + 1) falseExpr]
+  indentText firstIndex (Seq.singleton "if\n") ><
+  outputParenExpr consts (nextIndex + 1) (nextIndex + 1) condExpr ><
+  Seq.singleton "\n" >< indentText nextIndex (Seq.singleton "then\n") ><
+  outputParenExpr consts (nextIndex + 1) (nextIndex + 1) trueExpr ><
+  Seq.singleton "\n" >< indentText nextIndex (Seq.singleton "else\n") ><
+  outputParenExpr consts (nextIndex + 1) (nextIndex + 1) falseExpr
 
 -- | Output a list of expressions.
 outputExprs :: Seq.Seq RobotConstEntry -> Int -> Int -> Seq.Seq RobotExpr ->
-               Text.Text
+               Seq.Seq Text.Text
 outputExprs consts firstIndex nextIndex exprs =
   case Seq.length exprs of
-    0 -> indentText firstIndex "{}"
+    0 -> indentText firstIndex $ Seq.singleton "{}"
     1 ->
       case Seq.lookup 0 exprs of
         Just expr -> let exprText = outputExpr consts 0 (nextIndex + 1) expr
-                     in indentText firstIndex . Text.pack $
-                          printf "{%s}" exprText
+                     in indentText firstIndex $
+                        Seq.singleton "{" >< exprText >< Seq.singleton "}"
         Nothing -> error "this should be impossible"
     _ -> case Seq.lookup 0 exprs of
            Just expr ->
              let exprText = outputExpr consts 0 (nextIndex + 1) expr
-                 firstLine = indentText firstIndex . Text.pack $
-                             printf "{%s," exprText
+                 firstLine = indentText firstIndex $
+                             Seq.singleton "{" >< exprText >< Seq.singleton ","
                  (_, text) = foldl' (\(count, text) expr ->
                                        let exprText = outputExpr consts
                                                       (nextIndex + 1)
                                                       (nextIndex + 1) expr
                                            nextLine =
                                              if count > 0
-                                             then Text.append exprText ","
-                                             else Text.append exprText "}"
+                                             then exprText |> ","
+                                             else exprText |> "}"
                                        in (count - 1,
-                                           Text.append (Text.append text "\n")
+                                           text >< Seq.singleton "\n" ><
                                            nextLine))
                              (Seq.length exprs - 2, firstLine)
                              (Seq.drop 1 exprs)
@@ -124,44 +125,47 @@ outputExprs consts firstIndex nextIndex exprs =
 
 -- | Output an expression in parentheses.
 outputParenExpr :: Seq.Seq RobotConstEntry -> Int -> Int -> RobotExpr ->
-                   Text.Text
+                   Seq.Seq Text.Text
 outputParenExpr consts firstIndex nextIndex expr =
-  indentText firstIndex . Text.pack $ printf "(%s)"
-    (outputExpr consts 0 (nextIndex + 1) expr)
+  indentText firstIndex $ Seq.singleton "(" ><
+    outputExpr consts 0 (nextIndex + 1) expr >< Seq.singleton ")"
 
 -- | Output a value as text.
-outputValue :: Int -> Int -> RobotValue -> Text.Text
-outputValue firstIndex _ RobotNull = indentText firstIndex "null"
-outputValue firstIndex _ (RobotBool True) = indentText firstIndex "true"
-outputValue firstIndex _ (RobotBool False) = indentText firstIndex "false"
+outputValue :: Int -> Int -> RobotValue -> Seq.Seq Text.Text
+outputValue firstIndex _ RobotNull =
+  indentText firstIndex $ Seq.singleton "null"
+outputValue firstIndex _ (RobotBool True) =
+  indentText firstIndex $ Seq.singleton "true"
+outputValue firstIndex _ (RobotBool False) =
+  indentText firstIndex $ Seq.singleton "false"
 outputValue firstIndex _ (RobotInt value) =
-  indentText firstIndex . Text.pack $ printf "int %i" value
+  indentText firstIndex . Seq.singleton . Text.pack $ printf "int %i" value
 outputValue firstIndex _ (RobotFloat value) =
-  indentText firstIndex . Text.pack $ printf "float %g" value
+  indentText firstIndex . Seq.singleton . Text.pack $ printf "float %g" value
 outputValue firstIndex nextIndex (RobotVector values) =
   case Seq.length values of
-    0 -> indentText firstIndex "[]"
+    0 -> indentText firstIndex $ Seq.singleton "[]"
     1 ->
       case Seq.lookup 0 values of
         Just value -> let valueText = outputValue 0 (nextIndex + 1) value
-                      in indentText firstIndex . Text.pack $
-                           printf "[%s]" valueText
+                      in indentText firstIndex $ Seq.singleton "[" ><
+                         valueText >< Seq.singleton "]"
         Nothing -> error "this should be impossible"
     _ ->
       case Seq.lookup 0 values of
         Just value ->
           let valueText = outputValue 0 (nextIndex + 1) value
-              firstLine = indentText firstIndex . Text.pack $
-                          printf "[%s," valueText
+              firstLine = indentText firstIndex $ Seq.singleton "[" ><
+                          valueText >< Seq.singleton ","
               (_, text) = foldl' (\(count, text) value ->
                                     let valueText = outputValue (nextIndex + 1)
                                                     (nextIndex + 1) value
                                         nextLine =
                                           if count > 0
-                                          then Text.append valueText ","
-                                          else Text.append valueText "]"
+                                          then valueText |> ","
+                                          else valueText |> "]"
                                     in (count - 1,
-                                         Text.append (Text.append text "\n")
+                                        text >< Seq.singleton "\n" ><
                                          nextLine))
                           (Seq.length values - 2, firstLine)
                           (Seq.drop 1 values)
@@ -169,5 +173,5 @@ outputValue firstIndex nextIndex (RobotVector values) =
         Nothing -> error "this should be impossible"
 
 -- | Generate an indent string.
-indentText :: Int -> Text.Text -> Text.Text
-indentText n = Text.append (Text.replicate n " ")
+indentText :: Int -> Seq.Seq Text.Text -> Seq.Seq Text.Text
+indentText n s = (Text.replicate n " ") <| s

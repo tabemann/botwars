@@ -59,165 +59,165 @@ import qualified System.Random as Random
 
 -- | Robot continuity type
 data RobotCont m =
-  RobotCont { robotContParams :: RobotParams,
-              robotContRandom :: Random.StdGen,
-              robotContPrograms :: Seq.Seq RobotExpr,
-              robotContSavedWorlds :: Seq.Seq RobotWorld,
-              robotContEventHandler :: RobotEvent -> m RobotInput }
+  RobotCont { robotContParams :: !RobotParams,
+              robotContRandom :: !Random.StdGen,
+              robotContPrograms :: !(Seq.Seq RobotExpr),
+              robotContSavedWorlds :: !(Seq.Seq RobotWorld),
+              robotContEventHandler :: !(RobotEvent -> m RobotInput) }
 
 -- | Robot world type
 data RobotWorld =
-  RobotWorld { robotWorldParams :: RobotParams,
-               robotWorldRobots :: Seq.Seq Robot,
-               robotWorldShots :: Seq.Seq Shot,
-               robotWorldCycles :: Int,
-               robotWorldKills :: Int,
-               robotWorldNextRobotIndex :: Int,
-               robotWorldRandom :: Random.StdGen }
+  RobotWorld { robotWorldParams :: !RobotParams,
+               robotWorldRobots :: !(Seq.Seq Robot),
+               robotWorldShots :: !(Seq.Seq Shot),
+               robotWorldCycles :: !Int,
+               robotWorldKills :: !Int,
+               robotWorldNextRobotIndex :: !Int,
+               robotWorldRandom :: !Random.StdGen }
 
 -- | Robot mutation state type
 data RobotMutate =
-  RobotMutate { robotMutateParams :: RobotParams,
-                robotMutateRandom :: Random.StdGen }
+  RobotMutate { robotMutateParams :: !RobotParams,
+                robotMutateRandom :: !Random.StdGen }
 
 -- | Robot parameters
 data RobotParams =
-  RobotParams { robotParamsLocationFriction :: Double,
-                robotParamsRotationFriction :: Double,
-                robotParamsFireFactor :: Double,
-                robotParamsThrustFactor :: Double,
-                robotParamsTurnFactor :: Double,
-                robotParamsShotSpeed :: Double,
-                robotParamsShotEnergyDecay :: Double,
-                robotParamsShotMinFireEnergy :: Double,
-                robotParamsShotMinEnergy :: Double,
-                robotParamsRobotRadius :: Double,
-                robotParamsMaxCycles :: Int,
-                robotParamsMaxKills :: Int,
-                robotParamsMaxDepth :: Int,
-                robotParamsMaxInstrCount :: Int,
-                robotParamsMinKills :: Int,
-                robotParamsSavedWorldCount :: Int,
-                robotParamsViewAngle :: Double,
-                robotParamsViewDistance :: Double,
-                robotParamsViewSortAngleFactor :: Double,
-                robotParamsViewSortDistanceFactor :: Double,
-                robotParamsGeneralEnergyGain :: Double,
-                robotParamsWeaponEnergyGain :: Double,
-                robotParamsHealthGain :: Double,
-                robotParamsShotHarmFactor :: Double,
-                robotParamsMinInitialGeneralEnergy :: Double,
-                robotParamsMaxInitialGeneralEnergy :: Double,
-                robotParamsMinInitialWeaponEnergy :: Double,
-                robotParamsMaxInitialWeaponEnergy :: Double,
-                robotParamsMinInitialHealth :: Double,
-                robotParamsMaxInitialHealth :: Double,
-                robotParamsMinInitialLocationDeltaAbs :: Double,
-                robotParamsMaxInitialLocationDeltaAbs :: Double,
-                robotParamsMinInitialRotationDeltaAbs :: Double,
-                robotParamsMaxInitialRotationDeltaAbs :: Double,
-                robotParamsKillScore :: Double,
-                robotParamsHitScoreFactor :: Double,
-                robotParamsDieScore :: Double,
-                robotParamsDamagedScoreFactor :: Double,
-                robotParamsThrustScoreFactor :: Double,
-                robotParamsTurnScoreFactor :: Double,
-                robotParamsMutationChance :: Double,
-                robotParamsMutationReplaceLeafChance :: Double,
-                robotParamsMutationReplaceNodeChance :: Double,
-                robotParamsMutationInsertCondChance :: Double,
-                robotParamsMutationInsertCondAsTrueChance :: Double,
-                robotParamsMutationInsertBindChance :: Double,
-                robotParamsRandomBoolWeight :: Double,
-                robotParamsRandomIntWeight :: Double,
-                robotParamsRandomFloatWeight :: Double,
-                robotParamsRandomVectorWeight :: Double,
-                robotParamsRandomIntrinsicWeight :: Double,
-                robotParamsRandomIntRange :: (Int, Int),
-                robotParamsRandomFloatRange :: (Double, Double),
-                robotParamsRandomVectorMaxLength :: Int,
-                robotParamsRandomValueMaxDepth :: Int,
-                robotParamsRandomBindMaxCount :: Int,
-                robotParamsRandomFuncMaxCount :: Int,
-                robotParamsRandomApplyMaxCount :: Int,
-                robotParamsRandomSimpleConstWeight :: Double,
-                robotParamsRandomSimpleSpecialConstWeight :: Double,
-                robotParamsRandomBindWeight :: Double,
-                robotParamsRandomFuncWeight :: Double,
-                robotParamsRandomApplyWeight :: Double,
-                robotParamsRandomCondWeight :: Double,
-                robotParamsRandomApplySpecialWeight :: Double,
-                robotParamsRandomMaxDepth :: Int,
-                robotParamsReproduction :: Seq.Seq Int,
-                robotParamsSpecialConsts :: Seq.Seq RobotValue,
-                robotParamsSpecialValueCount :: Int }
+  RobotParams { robotParamsLocationFriction :: !Double,
+                robotParamsRotationFriction :: !Double,
+                robotParamsFireFactor :: !Double,
+                robotParamsThrustFactor :: !Double,
+                robotParamsTurnFactor :: !Double,
+                robotParamsShotSpeed :: !Double,
+                robotParamsShotEnergyDecay :: !Double,
+                robotParamsShotMinFireEnergy :: !Double,
+                robotParamsShotMinEnergy :: !Double,
+                robotParamsRobotRadius :: !Double,
+                robotParamsMaxCycles :: !Int,
+                robotParamsMaxKills :: !Int,
+                robotParamsMaxDepth :: !Int,
+                robotParamsMaxInstrCount :: !Int,
+                robotParamsMinKills :: !Int,
+                robotParamsSavedWorldCount :: !Int,
+                robotParamsViewAngle :: !Double,
+                robotParamsViewDistance :: !Double,
+                robotParamsViewSortAngleFactor :: !Double,
+                robotParamsViewSortDistanceFactor :: !Double,
+                robotParamsGeneralEnergyGain :: !Double,
+                robotParamsWeaponEnergyGain :: !Double,
+                robotParamsHealthGain :: !Double,
+                robotParamsShotHarmFactor :: !Double,
+                robotParamsMinInitialGeneralEnergy :: !Double,
+                robotParamsMaxInitialGeneralEnergy :: !Double,
+                robotParamsMinInitialWeaponEnergy :: !Double,
+                robotParamsMaxInitialWeaponEnergy :: !Double,
+                robotParamsMinInitialHealth :: !Double,
+                robotParamsMaxInitialHealth :: !Double,
+                robotParamsMinInitialLocationDeltaAbs :: !Double,
+                robotParamsMaxInitialLocationDeltaAbs :: !Double,
+                robotParamsMinInitialRotationDeltaAbs :: !Double,
+                robotParamsMaxInitialRotationDeltaAbs :: !Double,
+                robotParamsKillScore :: !Double,
+                robotParamsHitScoreFactor :: !Double,
+                robotParamsDieScore :: !Double,
+                robotParamsDamagedScoreFactor :: !Double,
+                robotParamsThrustScoreFactor :: !Double,
+                robotParamsTurnScoreFactor :: !Double,
+                robotParamsMutationChance :: !Double,
+                robotParamsMutationReplaceLeafChance :: !Double,
+                robotParamsMutationReplaceNodeChance :: !Double,
+                robotParamsMutationInsertCondChance :: !Double,
+                robotParamsMutationInsertCondAsTrueChance :: !Double,
+                robotParamsMutationInsertBindChance :: !Double,
+                robotParamsRandomBoolWeight :: !Double,
+                robotParamsRandomIntWeight :: !Double,
+                robotParamsRandomFloatWeight :: !Double,
+                robotParamsRandomVectorWeight :: !Double,
+                robotParamsRandomIntrinsicWeight :: !Double,
+                robotParamsRandomIntRange :: !(Int, Int),
+                robotParamsRandomFloatRange :: !(Double, Double),
+                robotParamsRandomVectorMaxLength :: !Int,
+                robotParamsRandomValueMaxDepth :: !Int,
+                robotParamsRandomBindMaxCount :: !Int,
+                robotParamsRandomFuncMaxCount :: !Int,
+                robotParamsRandomApplyMaxCount :: !Int,
+                robotParamsRandomSimpleConstWeight :: !Double,
+                robotParamsRandomSimpleSpecialConstWeight :: !Double,
+                robotParamsRandomBindWeight :: !Double,
+                robotParamsRandomFuncWeight :: !Double,
+                robotParamsRandomApplyWeight :: !Double,
+                robotParamsRandomCondWeight :: !Double,
+                robotParamsRandomApplySpecialWeight :: !Double,
+                robotParamsRandomMaxDepth :: !Int,
+                robotParamsReproduction :: !(Seq.Seq Int),
+                robotParamsSpecialConsts :: !(Seq.Seq RobotValue),
+                robotParamsSpecialValueCount :: !Int }
 
 -- | Intrinsic entry type
-data RobotConstEntry = RobotConstEntry RobotValue Text.Text
+data RobotConstEntry = RobotConstEntry !RobotValue !Text.Text
 
 -- | Robot state
 data RobotState =
-  RobotState { robotStateParams :: RobotParams,
-               robotStateDepth :: Int,
-               robotStateInstrCount :: Int }
+  RobotState { robotStateParams :: !RobotParams,
+               robotStateDepth :: !Int,
+               robotStateInstrCount :: !Int }
 
 -- | Robot type
 data Robot =
-  Robot { robotIndex :: Int,
-          robotExpr :: RobotExpr,
-          robotData :: RobotValue,
-          robotLocation :: (Double, Double),
-          robotLocationDelta :: (Double, Double),
-          robotRotation :: Double,
-          robotRotationDelta :: Double,
-          robotGeneralEnergy :: Double,
-          robotWeaponEnergy :: Double,
-          robotHealth :: Double,
-          robotScore :: Double }
+  Robot { robotIndex :: !Int,
+          robotExpr :: !RobotExpr,
+          robotData :: !RobotValue,
+          robotLocation :: !(Double, Double),
+          robotLocationDelta :: !(Double, Double),
+          robotRotation :: !Double,
+          robotRotationDelta :: !Double,
+          robotGeneralEnergy :: !Double,
+          robotWeaponEnergy :: !Double,
+          robotHealth :: !Double,
+          robotScore :: !Double }
 
 -- | Shot type
 data Shot =
-  Shot { shotLocation :: (Double, Double),
-         shotLocationDelta :: (Double, Double),
-         shotEnergy :: Double,
-         shotRobotIndex :: Int }
+  Shot { shotLocation :: !(Double, Double),
+         shotLocationDelta :: !(Double, Double),
+         shotEnergy :: !Double,
+         shotRobotIndex :: !Int }
 
 -- | Robot value type
 data RobotValue = RobotNull
-                | RobotBool Bool
-                | RobotInt Integer
-                | RobotFloat Double
-                | RobotVector (Seq.Seq RobotValue)
-                | RobotClosure RobotContext Int RobotExpr
-                | RobotIntrinsic RobotIntrinsicFunc
-                | RobotOutput RobotValue RobotAction
+                | RobotBool !Bool
+                | RobotInt !Integer
+                | RobotFloat !Double
+                | RobotVector !(Seq.Seq RobotValue)
+                | RobotClosure !RobotContext !Int !RobotExpr
+                | RobotIntrinsic !RobotIntrinsicFunc
+                | RobotOutput !RobotValue !RobotAction
 
 -- | Robot intrinsic function
 type RobotIntrinsicFunc =
   Seq.Seq RobotValue -> State.State RobotState RobotValue
 
 -- | Robot code type
-data RobotExpr = RobotLoad Int
-               | RobotConst RobotValue
-               | RobotSpecialConst Int
-               | RobotBind (Seq.Seq RobotExpr) RobotExpr
-               | RobotFunc Int RobotExpr
-               | RobotApply (Seq.Seq RobotExpr) RobotExpr
-               | RobotCond RobotExpr RobotExpr RobotExpr
+data RobotExpr = RobotLoad !Int
+               | RobotConst !RobotValue
+               | RobotSpecialConst !Int
+               | RobotBind !(Seq.Seq RobotExpr) !RobotExpr
+               | RobotFunc !Int !RobotExpr
+               | RobotApply !(Seq.Seq RobotExpr) !RobotExpr
+               | RobotCond !RobotExpr !RobotExpr !RobotExpr
 
 -- | Robot context type
 newtype RobotContext = RobotContext (Seq.Seq RobotValue)
 
 -- | Robot action
 data RobotAction =
-  RobotAction { robotActionFirePower :: Double,
-                robotActionThrustPower :: Double,
-                robotActionTurnPower :: Double }
+  RobotAction { robotActionFirePower :: !Double,
+                robotActionThrustPower :: !Double,
+                robotActionTurnPower :: !Double }
 
 -- | Robot event
-data RobotEvent = RobotNewRound RobotWorld
-                | RobotWorldCycle RobotWorld
-                | RobotRoundDone RobotWorld
+data RobotEvent = RobotNewRound !RobotWorld
+                | RobotWorldCycle !RobotWorld
+                | RobotRoundDone !RobotWorld
 
 -- | Robot input
 data RobotInput = RobotContinue
@@ -228,8 +228,8 @@ data RobotCycleState = RobotNextCycle
                      | RobotEndRound
 
 -- | Robot config entry
-data RobotConfigEntry = RobotConfigEntry Text.Text RobotConfigValue
+data RobotConfigEntry = RobotConfigEntry !Text.Text !RobotConfigValue
 
 -- | Robot config value
-data RobotConfigValue = RobotConfigNum Double
-                      | RobotConfigVector (Seq.Seq RobotConfigValue)
+data RobotConfigValue = RobotConfigNum !Double
+                      | RobotConfigVector !(Seq.Seq RobotConfigValue)

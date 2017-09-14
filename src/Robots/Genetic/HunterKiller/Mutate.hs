@@ -337,8 +337,9 @@ insertCond contextDepth expr = do
   insertCondAsTrueChance <-
     robotParamsMutationInsertCondAsTrueChance <$> robotMutateParams <$>
     State.get
-  condExpr <- randomExpr contextDepth
-  otherExpr <- randomExpr contextDepth
+  condExpr <- randomExpr' contextDepth 1
+  expr <- mutate contextDepth expr
+  otherExpr <- randomExpr' contextDepth 1
   if probability <= insertCondAsTrueChance
     then return $ RobotCond condExpr expr otherExpr
     else return $ RobotCond condExpr otherExpr expr
@@ -350,7 +351,8 @@ insertBind contextDepth expr = do
     robotParamsRandomBindMaxCount <$> robotMutateParams <$> State.get
   bindCount <- randomR (0, bindMaxCount)
   boundExprs <- Seq.replicateM bindCount
-                (randomExpr (contextDepth + bindCount))
+                (randomExpr' (contextDepth + bindCount) 1)
+  expr <- mutate contextDepth expr
   expr <- insertBindings contextDepth bindCount expr
   return $ RobotBind boundExprs expr
 

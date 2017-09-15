@@ -68,6 +68,7 @@ defaultParams =
                 robotParamsMaxKills = 100,
                 robotParamsMaxDepth = 1000,
                 robotParamsMinKills = 50,
+                robotParamsMaxCodeDepth = 50,
                 robotParamsSavedWorldCount = 25,
                 robotParamsMaxInstrCount = 5000,
                 robotParamsViewAngle = pi / 3.0,
@@ -180,6 +181,9 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
   else if name == "minKills"
   then parseLoBoundInt 0 entry $
        \value -> params { robotParamsMinKills = value }
+  else if name == "maxCodeDepth"
+  then parseLoBoundInt 1 entry $
+       \value -> params { robotParamsMaxCodeDepth = value }
   else if name == "savedWorldCount"
   then parseLoBoundInt 0 entry $
        \value -> params { robotParamsSavedWorldCount = value }

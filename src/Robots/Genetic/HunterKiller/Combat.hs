@@ -182,7 +182,7 @@ reproduce :: RobotParams -> (Seq.Seq RobotExpr, Random.StdGen) ->
 reproduce params (programs, gen) (program, count) =
   if count > 1
   then let (newProgram, mutateState) =
-             State.runState (mutate startingContextDepth program)
+             State.runState (mutate startingContextDepth 0 program)
                (RobotMutate { robotMutateRandom = gen,
                               robotMutateParams = params })
        in reproduce params

@@ -97,6 +97,7 @@ data RobotParams =
                 robotParamsMaxDepth :: !Int,
                 robotParamsMaxInstrCount :: !Int,
                 robotParamsMinKills :: !Int,
+                robotParamsMaxCodeDepth :: !Int,
                 robotParamsSavedWorldCount :: !Int,
                 robotParamsViewAngle :: !Double,
                 robotParamsViewDistance :: !Double,

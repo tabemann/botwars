@@ -124,8 +124,16 @@ executeCycles world = do
       let (cycleState, world') = State.runState worldCycle world
       in case cycleState of
            RobotNextCycle -> executeCycles world'
-           RobotEndRound -> return (RobotContinue, world')
-    RobotExit -> return (RobotExit, world)
+           RobotEndRound -> do
+             return (RobotContinue, (cleanupWorld world'))
+    RobotExit -> return (RobotExit, cleanupWorld world)
+
+-- | Clean up after a world.
+cleanupWorld :: RobotWorld -> RobotWorld
+cleanupWorld world =
+  world { robotWorldRobots =
+            fmap (\robot -> robot { robotData = RobotNull })
+                 (robotWorldRobots world) }
 
 -- | Prepare the next round.
 prepareNextRound :: Monad m => RobotWorld -> State.StateT (RobotCont m) m ()

@@ -226,7 +226,7 @@ randomExpr' contextDepth randomDepth totalDepth = do
           funcWeight = robotParamsRandomFuncWeight params
           applyWeight = robotParamsRandomApplyWeight params
           condWeight = robotParamsRandomCondWeight params
-      if totalDepth < maxCodeDepth - 1
+      if totalDepth < maxCodeDepth - 2
         then do
           probability <- random
           if probability < bindWeight
@@ -294,7 +294,7 @@ randomSimple contextDepth totalDepth = do
   let constWeight = robotParamsRandomSimpleConstWeight params
       specialConstWeight = robotParamsRandomSimpleSpecialConstWeight params
       maxCodeDepth = robotParamsMaxCodeDepth params
-  if totalDepth < maxCodeDepth
+  if totalDepth < maxCodeDepth - 1
     then do if exprValue < constWeight
               then RobotConst <$> randomValue (totalDepth + 1)
               else if exprValue < constWeight + specialConstWeight
@@ -312,8 +312,8 @@ randomValue totalDepth = do
   valueMaxDepth <-
     robotParamsRandomValueMaxDepth . robotMutateParams <$> State.get
   if (maxCodeDepth - totalDepth) > valueMaxDepth
-    then randomValue' valueMaxDepth
-    else randomValue' $ maxCodeDepth - totalDepth
+    then randomValue' $ valueMaxDepth - 1
+    else randomValue' $ (maxCodeDepth - totalDepth) - 1
 
 -- | Actually generate a random value.
 randomValue' :: Int -> State.State RobotMutate RobotValue

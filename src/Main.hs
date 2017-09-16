@@ -234,7 +234,7 @@ handleRobotEvent path canvas worldRef (RobotWorldCycle world) = do
       Just window -> #invalidateRect window Nothing True
       Nothing -> return ()
     return False
-  threadDelay 10
+  threadDelay . robotParamsCycleDelay $ robotWorldParams world
   let robotDisplay =
         Text.concat
          (toList (fmap (\robot ->

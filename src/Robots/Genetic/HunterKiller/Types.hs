@@ -82,7 +82,8 @@ data RobotMutate =
 
 -- | Robot parameters
 data RobotParams =
-  RobotParams { robotParamsLocationFriction :: !Double,
+  RobotParams { robotParamsCycleDelay :: !Int,
+                robotParamsLocationFriction :: !Double,
                 robotParamsRotationFriction :: !Double,
                 robotParamsFireFactor :: !Double,
                 robotParamsThrustFactor :: !Double,

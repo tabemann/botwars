@@ -1,7 +1,7 @@
+cycleDelay = 10000
 locationFriction = 0.03
 rotationFriction = 0.005
 minInitialLocationDeltaAbs = 0
-maxInitialLocationDeltaAbs = 0.001
 maxKills = 200
 maxCycles = 5000
 minKills = 75
@@ -10,7 +10,7 @@ savedWorldCount = 10
 robotRadius = 0.00375
 shotSpeed = 0.16
 shotEnergyDecay = 0.05
-shotMinEnergy = 0.1
+shotMinFireEnergy = 0.1
 thrustFactor = 0.005
 turnFactor = 0.6283185307179586
 generalEnergyGain = 0.1

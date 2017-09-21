@@ -58,12 +58,12 @@ import qualified Control.Monad.State.Strict as State
 import qualified System.Random as Random
 
 -- | Robot continuity type
-data RobotCont m =
+data RobotCont =
   RobotCont { robotContParams :: !RobotParams,
               robotContRandom :: !Random.StdGen,
+              robotContWorld :: !(Maybe RobotWorld),
               robotContPrograms :: !(Seq.Seq RobotExpr),
-              robotContSavedWorlds :: !(Seq.Seq RobotWorld),
-              robotContEventHandler :: !(RobotEvent -> m RobotInput) }
+              robotContSavedWorlds :: !(Seq.Seq RobotWorld) }
 
 -- | Robot world type
 data RobotWorld =
@@ -217,8 +217,7 @@ data RobotAction =
                 robotActionTurnPower :: !Double }
 
 -- | Robot event
-data RobotEvent = RobotNewRound !RobotWorld
-                | RobotWorldCycle !RobotWorld
+data RobotEvent = RobotWorldCycle !RobotWorld
                 | RobotRoundDone !RobotWorld
 
 -- | Robot input

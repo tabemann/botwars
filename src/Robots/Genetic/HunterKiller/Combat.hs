@@ -27,10 +27,13 @@
 -- ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 -- POSSIBILITY OF SUCH DAMAGE.
 
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, BangPatterns #-}
 
 module Robots.Genetic.HunterKiller.Combat
 
+  (initCont,
+   executeCycle)
+  
 where
 
 import Robots.Genetic.HunterKiller.Types
@@ -50,83 +53,75 @@ import Data.Foldable (foldlM,
                       foldl')
 
 -- | Execute robot combat.
-combat :: Monad m => (RobotEvent -> m RobotInput) -> Seq.Seq RobotExpr ->
-          RobotParams -> Random.StdGen -> m (Seq.Seq RobotExpr, Random.StdGen)
-combat func programs params gen = do
-  cont <- State.execStateT executeRounds
-    (RobotCont { robotContParams = params,
-                 robotContRandom = gen,
-                 robotContPrograms = programs,
-                 robotContSavedWorlds = Seq.empty,
-                 robotContEventHandler = func })
-  return (robotContPrograms cont, robotContRandom cont)
+initCont :: Seq.Seq RobotExpr -> RobotParams -> Random.StdGen -> RobotCont
+initCont programs params gen = do
+  RobotCont { robotContParams = params,
+              robotContRandom = gen,
+              robotContWorld = Nothing,
+              robotContPrograms = programs,
+              robotContSavedWorlds = Seq.empty }
 
--- | Execute rounds of combat.
-executeRounds :: Monad m => State.StateT (RobotCont m) m ()
-executeRounds = do
+-- | Execute a cycle.
+executeCycle :: RobotCont -> (RobotEvent, RobotCont)
+executeCycle cont =
+  State.runState executeCycle' cont
+  where
+    executeCycle' = do
+      world <- robotContWorld <$> State.get
+      case world of
+        Nothing -> do
+          world <- setupWorld
+          State.modify $ \cont -> cont { robotContWorld = Just world }
+          executeCycle'
+        Just world ->
+          let (cycleState, !world') = State.runState worldCycle world
+          in case cycleState of
+               RobotNextCycle -> do
+                 State.modify $ \cont -> cont { robotContWorld = Just world' }
+                 return $ RobotWorldCycle world'
+               RobotEndRound -> do
+                 State.modify $ \cont -> cont { robotContWorld = Just world' }
+                 startNextRound
+                 maybeWorld <- robotContWorld <$> State.get
+                 case maybeWorld of
+                   Just world -> return $ RobotRoundDone world
+                   Nothing -> error "impossible"
+
+-- | Start the next round
+startNextRound :: State.State RobotCont ()
+startNextRound = do
+  world <- do
+    world <- robotContWorld <$> State.get
+    case world of
+      Just world -> return $ cleanupWorld world
+      Nothing -> error "impossible"
+  savedWorlds <- robotContSavedWorlds <$> State.get
+  minKills <- robotParamsMinKills <$> robotContParams <$> State.get
+  savedWorldCount <-
+    robotParamsSavedWorldCount <$> robotContParams <$> State.get
+  if robotWorldKills world >= minKills
+    then do
+      State.modify $ \cont -> cont { robotContSavedWorlds =
+                                       Seq.take savedWorldCount
+                                       (world <| savedWorlds) }
+      prepareNextRound world
+    else
+      case Seq.lookup 1 savedWorlds of
+        Just savedWorld -> do
+          let savedWorld' =
+                savedWorld { robotWorldRandom = robotWorldRandom world }
+          State.modify $ \cont -> cont { robotContSavedWorlds =
+                                           Seq.drop 1 savedWorlds }
+          prepareNextRound savedWorld'
+        Nothing ->
+          case Seq.lookup 0 savedWorlds of
+            Just savedWorld -> do
+              let savedWorld' =
+                    savedWorld { robotWorldRandom = robotWorldRandom world }
+              prepareNextRound savedWorld'
+            Nothing -> prepareNextRound world
   world <- setupWorld
-  eventHandler <- robotContEventHandler <$> State.get
-  input <- lift . eventHandler $ RobotNewRound world
-  case input of
-    RobotContinue -> do
-      (input, world') <- executeCycles world
-      case input of
-        RobotContinue -> do
-          input <- lift . eventHandler $ RobotRoundDone world'
-          case input of
-            RobotContinue -> do
-              savedWorlds <- robotContSavedWorlds <$> State.get
-              minKills <- robotParamsMinKills . robotContParams <$> State.get
-              if robotWorldKills world' >= minKills
-                then do
-                  savedWorldCount <-
-                    robotParamsSavedWorldCount <$> robotContParams <$> State.get
-                  State.modify $ \contState ->
-                    contState { robotContSavedWorlds =
-                                  Seq.take savedWorldCount
-                                    (world' <| savedWorlds) }
-                  prepareNextRound world'
-                else
-                  case Seq.lookup 1 savedWorlds of
-                    Just savedWorld -> do
-                      let savedWorld' =
-                            savedWorld { robotWorldRandom =
-                                           robotWorldRandom world' }
-                      State.modify $ \contState ->
-                        contState { robotContSavedWorlds =
-                                      Seq.drop 1 savedWorlds }
-                      prepareNextRound savedWorld'
-                    Nothing ->
-                      case Seq.lookup 0 savedWorlds of
-                        Just savedWorld -> do
-                          let savedWorld' =
-                                savedWorld { robotWorldRandom =
-                                               robotWorldRandom world' }
-                          prepareNextRound savedWorld'
-                        Nothing -> do
-                          let world'' =
-                                world { robotWorldRandom =
-                                          robotWorldRandom world' }
-                          prepareNextRound world''
-              executeRounds
-            RobotExit -> return ()
-        RobotExit -> return ()
-    RobotExit -> return ()
-
--- | Execute cycles of combat.
-executeCycles :: Monad m => RobotWorld ->
-                 State.StateT (RobotCont m) m (RobotInput, RobotWorld)
-executeCycles world = do
-  eventHandler <- robotContEventHandler <$> State.get
-  input <- lift . eventHandler $ RobotWorldCycle world
-  case input of
-    RobotContinue ->
-      let (cycleState, world') = State.runState worldCycle world
-      in case cycleState of
-           RobotNextCycle -> executeCycles world'
-           RobotEndRound -> do
-             return (RobotContinue, (cleanupWorld world'))
-    RobotExit -> return (RobotExit, cleanupWorld world)
+  State.modify $ \cont -> cont { robotContWorld = Just world }
 
 -- | Clean up after a world.
 cleanupWorld :: RobotWorld -> RobotWorld
@@ -136,7 +131,7 @@ cleanupWorld world =
                  (robotWorldRobots world) }
 
 -- | Prepare the next round.
-prepareNextRound :: Monad m => RobotWorld -> State.StateT (RobotCont m) m ()
+prepareNextRound :: RobotWorld -> State.State RobotCont ()
 prepareNextRound world = do
   params <- robotContParams <$> State.get
   let reproduction = robotParamsReproduction params
@@ -201,7 +196,7 @@ reproduce params (programs, gen) (program, count) =
   else (programs, gen)
 
 -- | Set up a world.
-setupWorld :: Monad m => State.StateT (RobotCont m) m RobotWorld
+setupWorld :: State.State RobotCont RobotWorld
 setupWorld = do
   params <- robotContParams <$> State.get
   programs <- robotContPrograms <$> State.get
@@ -219,7 +214,7 @@ setupWorld = do
                         robotWorldRandom = gen }
 
 -- | Set up a robot.
-setupRobot :: Monad m => RobotExpr -> Int -> State.StateT (RobotCont m) m Robot
+setupRobot :: RobotExpr -> Int -> State.State RobotCont Robot
 setupRobot program index = do
   params <- robotContParams <$> State.get
   gen <- robotContRandom <$> State.get
@@ -228,15 +223,14 @@ setupRobot program index = do
   return robot
   
 -- | Get a random value in [0, 1)
-random :: (Monad m, Random.Random a) => State.StateT (RobotCont m) m a
+random :: Random.Random a => State.State RobotCont a
 random = do
   (value, gen) <- Random.random <$> robotContRandom <$> State.get
   state $ \contState -> ((), contState { robotContRandom = gen })
   return value
 
 -- | Get a random value in [a, b]
-randomR :: (Monad m, Random.Random a) => (a, a) ->
-           State.StateT (RobotCont m) m a
+randomR :: Random.Random a => (a, a) -> State.State RobotCont a
 randomR range = do
   (value, gen) <- Random.randomR range <$> robotContRandom <$> State.get
   state $ \contState -> ((), contState { robotContRandom = gen })

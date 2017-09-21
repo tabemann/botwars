@@ -42,9 +42,11 @@ import Robots.Genetic.HunterKiller.Render
 import Control.Concurrent (forkIO,
                            forkOS,
                            threadDelay)
-import Control.Concurrent.MVar (newEmptyMVar,
+import Control.Concurrent.MVar (MVar,
+                                newEmptyMVar,
                                 putMVar,
-                                takeMVar)
+                                takeMVar,
+                                tryTakeMVar)
 import System.Exit (exitWith,
                     exitFailure,
                     ExitCode(..))
@@ -78,7 +80,8 @@ import Data.IORef (IORef,
                    newIORef,
                    readIORef,
                    writeIORef)
-import System.Random (newStdGen)
+import System.Random (StdGen,
+                      newStdGen)
 import Data.Foldable (foldl',
                       toList)
 import GI.GLib (idleAdd,
@@ -147,23 +150,17 @@ getInputs = do
 -- | Set up the UI and prepare for running.
 setup :: Seq.Seq RobotExpr -> RobotParams -> FilePath -> IO ()
 setup exprs params savePath = do
-  exit <- newEmptyMVar
-
+  exitMVar <- newEmptyMVar
+  reallyExitMVar <- newEmptyMVar
   Gtk.init Nothing
-
   window <- new Gtk.Window [ #title := "Botwars",
                              #borderWidth := 10 ]
-
   on window #destroy $ do
     Gtk.mainQuit
-    putMVar exit ExitSuccess
-
+    putMVar exitMVar ExitSuccess
   canvas <- new Gtk.DrawingArea []
-
   #setSizeRequest canvas 920 920
-
   worldRef <- newIORef Nothing
-  
   on canvas #draw $ \(Context fp) -> do
     withManagedPtr fp $ \p ->
       (`runReaderT` Cairo (castPtr p)) $ runRender $ do
@@ -174,35 +171,59 @@ setup exprs params savePath = do
         Just world -> drawWorld world w h
         Nothing -> return ()
       return True
-
   #add window canvas
-  
   gen <- newStdGen
-  
   #showAll window
-
   forkOS Gtk.main
-
   forkIO $ do
-    catch (combat (handleRobotEvent savePath canvas worldRef) exprs params gen >> return ())
-      (\e -> putStr . printf "%s\n" $ show (e :: SomeException))
-    putStr "Exited\n"
-    return ()
+    mainLoop (initCont exprs params gen) savePath canvas worldRef exitMVar
+      reallyExitMVar
+  exitStatus <- takeMVar reallyExitMVar
+  exitWith exitStatus 
 
-  exitStatus <- takeMVar exit
-
-  world <- readIORef worldRef
-  case world of
-    Just world -> do
+-- | Execute the main loop of the genetically-programmed robot fighting arena.
+mainLoop :: RobotCont -> FilePath -> Gtk.DrawingArea ->
+            IORef (Maybe RobotWorld) -> MVar ExitCode -> MVar ExitCode -> IO ()
+mainLoop cont savePath canvas worldRef exitMVar reallyExitMVar = do
+  let (event, cont') = executeCycle cont
+      world = case event of
+        RobotWorldCycle world -> world
+        RobotRoundDone world -> world
+  exitStatus <- tryTakeMVar exitMVar
+  case exitStatus of
+    Nothing -> do
+      writeIORef worldRef (Just world)
+      Gdk.threadsAddIdle PRIORITY_HIGH $ do
+        window <- #getWindow canvas
+        case window of
+          Just window -> #invalidateRect window Nothing True
+          Nothing -> return ()
+        return False
+      let robotDisplay =
+            Text.concat
+            (toList (fmap (\robot ->
+                             Text.pack $ printf "%d " (robotIndex robot))
+                      (robotWorldRobots world)))
+          shotDisplay =
+            Text.concat
+            (toList (fmap (\shot ->
+                             Text.pack $ printf "%d " (shotRobotIndex shot))
+                      (robotWorldShots world)))
+      putStr $ printf "Robots: %sShots: %s\n" robotDisplay shotDisplay
+      case event of
+        RobotRoundDone _ ->
+          saveWorldToFile (savePath ++ ".prev") world >> return ()
+        _ -> return ()
+      threadDelay . robotParamsCycleDelay $ robotWorldParams world
+      mainLoop cont' savePath canvas worldRef exitMVar reallyExitMVar
+    Just exitStatus -> do
       status <- saveWorldToFile savePath world
       case status of
         Right () -> return ()
         Left errorText -> do
           TextIO.hPutStr stderr errorText
           exitFailure
-    Nothing -> return ()
-
-  exitWith exitStatus
+      putMVar reallyExitMVar exitStatus
 
 -- | Save a world.
 saveWorldToFile :: FilePath -> RobotWorld -> IO (Either Text.Text ())
@@ -218,42 +239,3 @@ saveWorldToFile path world = do
       return $ Right ()
     Left errorText -> do
       return $ Left errorText
-      
--- | Handle a robot event.
-handleRobotEvent :: FilePath -> Gtk.DrawingArea -> IORef (Maybe RobotWorld) ->
-                    RobotEvent -> IO RobotInput
-handleRobotEvent path canvas worldRef (RobotNewRound world) = do
-  writeIORef worldRef (Just world)
-  putStr "RobotNewRound\n"
-  return RobotContinue
-handleRobotEvent path canvas worldRef (RobotWorldCycle world) = do
-  writeIORef worldRef (Just world)
-  Gdk.threadsAddIdle PRIORITY_HIGH $ do
-    window <- #getWindow canvas
-    case window of
-      Just window -> #invalidateRect window Nothing True
-      Nothing -> return ()
-    return False
-  threadDelay . robotParamsCycleDelay $ robotWorldParams world
-  let robotDisplay =
-        Text.concat
-         (toList (fmap (\robot ->
-                          Text.pack $ printf "%d " (robotIndex robot))
-                   (robotWorldRobots world)))
-      shotDisplay =
-        Text.concat
-         (toList (fmap (\shot ->
-                          Text.pack $ printf "%d " (shotRobotIndex shot))
-                   (robotWorldShots world)))
-  putStr $ printf "Robots: %sShots: %s\n" robotDisplay shotDisplay
-  return RobotContinue
-handleRobotEvent path canvas worldRef (RobotRoundDone world) = do
-  writeIORef worldRef (Just world)
-  putStr "RobotRoundDone\n"
-  status <- saveWorldToFile (path ++ ".prev") world
-  case status of
-    Right () -> return ()
-    Left errorText -> do
-      TextIO.hPutStr stderr errorText
-      return ()
-  return RobotContinue

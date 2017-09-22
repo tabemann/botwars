@@ -82,11 +82,8 @@ executeCycle cont =
                RobotEndRound -> do
                  State.modify $ \cont -> cont { robotContWorld = Just world' }
                  startNextRound
-                 maybeWorld <- robotContWorld <$> State.get
-                 case maybeWorld of
-                   Just world -> return $ RobotRoundDone world
-                   Nothing -> error "impossible"
-
+                 return $ RobotRoundDone world'
+                 
 -- | Start the next round
 startNextRound :: State.State RobotCont ()
 startNextRound = do

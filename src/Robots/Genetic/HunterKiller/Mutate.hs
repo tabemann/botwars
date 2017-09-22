@@ -142,24 +142,45 @@ mutateNode contextDepth totalDepth expr = do
           mutateFunc contextDepth totalDepth argCount expr
         RobotApply argExprs expr ->
           mutateApply contextDepth totalDepth argExprs expr
-        _ -> return expr
+        RobotCond condExpr trueExpr falseExpr ->
+          mutateCond contextDepth totalDepth condExpr trueExpr falseExpr
 
 -- | Directly mutate a bind expression.
 mutateBind :: Int -> Int -> Seq.Seq RobotExpr -> RobotExpr ->
               State.State RobotMutate RobotExpr
 mutateBind contextDepth totalDepth boundExprs expr = do
-  bindMaxCount <- robotParamsRandomBindMaxCount <$> robotMutateParams <$> State.get
-  bindCount <- randomR (0, bindMaxCount)
-  let oldBindCount = Seq.length boundExprs
-  boundExprs' <- mapM (adjustLoads oldBindCount (bindCount - oldBindCount))
-                 (Seq.take bindCount boundExprs)
-  expr' <- adjustLoads oldBindCount (bindCount - oldBindCount) expr
-  if bindCount <= oldBindCount
-    then return $ RobotBind boundExprs' expr'
-    else do newBoundExprs <- Seq.replicateM (bindCount - oldBindCount)
-                             (randomExpr (contextDepth + bindCount)
-                              (totalDepth + 1))
-            return $ RobotBind (boundExprs' >< newBoundExprs) expr'
+  flipBindChance <- robotParamsMutationFlipBindChance <$>
+                    robotMutateParams <$> State.get
+  probability <- random
+  let bindCount = Seq.length boundExprs
+  if probability <= flipBindChance
+    then
+      if bindCount > 0
+      then do
+        index0 <- randomR (0, bindCount - 1)
+        index1 <- randomR (0, bindCount - 1)
+        case Seq.lookup index0 boundExprs of
+          Just boundExpr0 ->
+            case Seq.lookup index1 boundExprs of
+              Just boundExpr1 ->
+                let boundExprs' = Seq.update index0 boundExpr1 boundExprs
+                    boundExprs'' = Seq.update index1 boundExpr0 boundExprs'
+                in return $ RobotBind boundExprs'' expr
+              Nothing -> error "impossible"
+          Nothing -> error "impossible"
+      else return $ RobotBind boundExprs expr
+    else do
+      bindMaxCount <- robotParamsRandomBindMaxCount <$> robotMutateParams <$> State.get
+      newBindCount <- randomR (0, bindMaxCount)
+      boundExprs' <- mapM (adjustLoads bindCount (newBindCount - bindCount))
+                     (Seq.take newBindCount boundExprs)
+      expr' <- adjustLoads bindCount (newBindCount - bindCount) expr
+      if newBindCount <= bindCount
+        then return $ RobotBind boundExprs' expr'
+        else do newBoundExprs <- Seq.replicateM (newBindCount - bindCount)
+                                 (randomExpr (contextDepth + newBindCount)
+                                  (totalDepth + 1))
+                return $ RobotBind (boundExprs' >< newBoundExprs) expr'
 
 -- | Directly mutate a func expression.
 mutateFunc :: Int -> Int -> Int -> RobotExpr ->
@@ -173,15 +194,67 @@ mutateFunc contextDepth totalDepth argCount expr = do
 mutateApply :: Int -> Int -> Seq.Seq RobotExpr -> RobotExpr ->
                State.State RobotMutate RobotExpr
 mutateApply contextDepth totalDepth argExprs funcExpr = do
-  applyMaxCount <- robotParamsRandomApplyMaxCount <$> robotMutateParams <$> State.get
-  applyCount <- randomR (0, applyMaxCount)
-  let oldApplyCount = Seq.length argExprs
-      argExprs' = Seq.take applyCount argExprs
-  if applyCount <= oldApplyCount
-    then return $ RobotApply argExprs' funcExpr
-    else do newArgExprs <- Seq.replicateM (applyCount - oldApplyCount)
-                           (randomExpr contextDepth (totalDepth + 1))
-            return $ RobotApply (argExprs' >< newArgExprs) funcExpr
+  removeApplyChance <- robotParamsMutationRemoveApplyChance <$>
+                       robotMutateParams <$> State.get
+  flipApplyChance <- robotParamsMutationFlipApplyChance <$>
+                     robotMutateParams <$> State.get
+  probability <- random
+  let applyCount = Seq.length argExprs
+  if probability <= removeApplyChance
+    then
+      if applyCount > 0
+      then do
+        selectedArgIndex <- randomR (0, applyCount - 1)
+        case Seq.lookup selectedArgIndex argExprs of
+          Just argExpr -> return argExpr
+          Nothing -> error "impossible"
+      else return $ RobotConst RobotNull
+    else if probability <= removeApplyChance + flipApplyChance
+    then
+      if applyCount > 0
+      then do
+        index0 <- randomR (0, applyCount - 1)
+        index1 <- randomR (0, applyCount - 1)
+        case Seq.lookup index0 argExprs of
+          Just argExpr0 ->
+            case Seq.lookup index1 argExprs of
+              Just argExpr1 ->
+                let argExprs' = Seq.update index0 argExpr1 argExprs
+                    argExprs'' = Seq.update index1 argExpr0 argExprs'
+                in return $ RobotApply argExprs'' funcExpr
+              Nothing -> error "impossible"
+          Nothing -> error "impossible"
+      else return $ RobotApply argExprs funcExpr
+    else do
+      applyMaxCount <- robotParamsRandomApplyMaxCount <$> robotMutateParams <$> State.get
+      newApplyCount <- randomR (0, applyMaxCount)
+      let argExprs' = Seq.take newApplyCount argExprs
+      if newApplyCount <= applyCount
+        then return $ RobotApply argExprs' funcExpr
+        else do newArgExprs <- Seq.replicateM (newApplyCount - applyCount)
+                               (randomExpr contextDepth (totalDepth + 1))
+                return $ RobotApply (argExprs' >< newArgExprs) funcExpr
+
+-- | Directly mutate a cond expression.
+mutateCond :: Int -> Int -> RobotExpr -> RobotExpr -> RobotExpr ->
+              State.State RobotMutate RobotExpr
+mutateCond contextDepth totalDepth condExpr trueExpr falseExpr = do
+  removeCondChance <- robotParamsMutationRemoveCondChance <$>
+                      robotMutateParams <$> State.get
+  removeCondAsTrueChance <- robotParamsMutationRemoveCondAsTrueChance <$>
+                            robotMutateParams <$> State.get
+  flipCondChance <- robotParamsMutationFlipCondChance <$>
+                    robotMutateParams <$> State.get
+  probability <- random
+  if probability <= removeCondChance
+    then do
+      probability <- random
+      if probability <= removeCondAsTrueChance
+        then return trueExpr
+        else return falseExpr
+    else if probability <= removeCondChance + flipCondChance
+    then return $ RobotCond condExpr falseExpr trueExpr
+    else return $ RobotCond condExpr trueExpr falseExpr
 
 -- | Adjust load expressions.
 adjustLoads :: Int -> Int -> RobotExpr -> State.State RobotMutate RobotExpr

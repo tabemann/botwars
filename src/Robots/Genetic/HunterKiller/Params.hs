@@ -102,6 +102,12 @@ defaultParams =
                 robotParamsMutationInsertCondChance = 0.05,
                 robotParamsMutationInsertCondAsTrueChance = 0.75,
                 robotParamsMutationInsertBindChance = 0.05,
+                robotParamsMutationRemoveCondChance = 0.1,
+                robotParamsMutationRemoveCondAsTrueChance = 0.75,
+                robotParamsMutationFlipCondChance = 0.25,
+                robotParamsMutationRemoveApplyChance = 0.1,
+                robotParamsMutationFlipApplyChance = 0.25,
+                robotParamsMutationFlipBindChance = 0.25,
                 robotParamsRandomBoolWeight = 0.2,
                 robotParamsRandomIntWeight = 0.2,
                 robotParamsRandomFloatWeight = 0.4,
@@ -281,6 +287,24 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
   else if name == "mutationInsertBindChance"
   then parseBoundFloat (0.0, 1.0) entry $
        \value -> params { robotParamsMutationInsertBindChance = value }
+  else if name == "mutationRemoveCondChance"
+  then parseBoundFloat (0.0, 1.0) entry $
+       \value -> params { robotParamsMutationRemoveCondChance = value }
+  else if name == "mutationRemoveCondAsTrueChance"
+  then parseBoundFloat (0.0, 1.0) entry $
+       \value -> params { robotParamsMutationRemoveCondAsTrueChance = value }
+  else if name == "mutationFlipCondChance"
+  then parseBoundFloat (0.0, 1.0) entry $
+       \value -> params { robotParamsMutationFlipCondChance = value }
+  else if name == "mutationRemoveApplyChance"
+  then parseBoundFloat (0.0, 1.0) entry $
+       \value -> params { robotParamsMutationRemoveApplyChance = value }
+  else if name == "mutationFlipApplyChance"
+  then parseBoundFloat (0.0, 1.0) entry $
+       \value -> params { robotParamsMutationFlipApplyChance = value }
+  else if name == "mutationFlipBindChance"
+  then parseBoundFloat (0.0, 1.0) entry $
+       \value -> params { robotParamsMutationFlipBindChance = value }
   else if name == "randomBoolWeight"
   then parseFloat entry $
        \value -> params { robotParamsRandomBoolWeight = value }

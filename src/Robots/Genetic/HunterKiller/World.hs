@@ -53,8 +53,6 @@ import Control.Monad (mapM,
 import Data.Foldable (Foldable,
                       foldl')
 import qualified System.Random as Random
-import System.IO.Unsafe (unsafePerformIO)
-import Text.Printf
 
 -- | Execute a world cycle.
 worldCycle :: State.State RobotWorld RobotCycleState

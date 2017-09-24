@@ -132,19 +132,33 @@ prepareNextRound :: RobotWorld -> State.State RobotCont ()
 prepareNextRound world = do
   params <- robotContParams <$> State.get
   let reproduction = robotParamsReproduction params
+      mutatedReproduction = robotParamsMutatedReproduction params
       sortedRobots = Seq.sortBy
         (\robot0 robot1 -> compare (exprSize (robotExpr robot1))
           (exprSize (robotExpr robot0))) (robotWorldRobots world)
       sortedRobots' = Seq.sortBy (\robot0 robot1 -> compare (robotScore robot1)
                                    (robotScore robot0)) sortedRobots
       programs = fmap robotExpr sortedRobots'
-      totalNew = foldl' (+) 0 reproduction
+      totalNew = foldl' (+) 0 reproduction + foldl' (+) 0 mutatedReproduction
+      reproduction' =
+        if Seq.length reproduction < Seq.length mutatedReproduction
+        then reproduction >< Seq.replicate (Seq.length mutatedReproduction -
+                                             Seq.length reproduction) 0
+        else reproduction
+      mutatedReproduction' =
+        if Seq.length mutatedReproduction < Seq.length reproduction
+        then mutatedReproduction ><
+             Seq.replicate (Seq.length reproduction -
+                            Seq.length mutatedReproduction) 0
+        else mutatedReproduction
+      combinedReproduction = Seq.zip reproduction' mutatedReproduction'
+      takeCount = Seq.length programs -
+                  (totalNew - Seq.length combinedReproduction)
       (reproduced, nonReproduced) =
-        Seq.splitAt (Seq.length reproduction) (Seq.take (Seq.length programs - (totalNew - Seq.length reproduction))
-                              programs)
+        Seq.splitAt (Seq.length reproduction) (Seq.take takeCount programs)
       (programs', gen) = foldl' (reproduce params)
                            (nonReproduced, robotWorldRandom world)
-                           (Seq.zip reproduced reproduction)
+                           (Seq.zip reproduced combinedReproduction)
   State.modify $ \contState ->
                    contState { robotContPrograms = programs',
                                robotContRandom = robotWorldRandom world }
@@ -178,19 +192,17 @@ valueSize (RobotOutput value _) = 1 + valueSize value
 
 -- | Reproduce a robot
 reproduce :: RobotParams -> (Seq.Seq RobotExpr, Random.StdGen) ->
-             (RobotExpr, Int) -> (Seq.Seq RobotExpr, Random.StdGen)
-reproduce params (programs, gen) (program, count) =
-  if count > 1
+             (RobotExpr, (Int, Int)) -> (Seq.Seq RobotExpr, Random.StdGen)
+reproduce params (programs, gen) (program, (unmutatedCount, mutatedCount)) =
+  if mutatedCount > 0
   then let (newProgram, mutateState) =
              State.runState (mutate startingContextDepth 0 program)
                (RobotMutate { robotMutateRandom = gen,
                               robotMutateParams = params })
        in reproduce params
             (programs |> newProgram, robotMutateRandom mutateState)
-            (program, count - 1)
-  else if count == 1
-  then (programs |> program, gen)
-  else (programs, gen)
+            (program, (unmutatedCount, mutatedCount - 1))
+  else (programs >< Seq.replicate unmutatedCount program, gen)
 
 -- | Set up a world.
 setupWorld :: State.State RobotCont RobotWorld

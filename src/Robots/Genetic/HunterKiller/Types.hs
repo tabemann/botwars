@@ -157,6 +157,7 @@ data RobotParams =
                 robotParamsRandomApplySpecialWeight :: !Double,
                 robotParamsRandomMaxDepth :: !Int,
                 robotParamsReproduction :: !(Seq.Seq Int),
+                robotParamsMutatedReproduction :: !(Seq.Seq Int),
                 robotParamsSpecialConsts :: !(Seq.Seq RobotValue),
                 robotParamsSpecialValueCount :: !Int }
 

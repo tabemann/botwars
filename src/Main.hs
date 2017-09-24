@@ -153,15 +153,15 @@ setup exprs params savePath = do
   exitMVar <- newEmptyMVar
   reallyExitMVar <- newEmptyMVar
   Gtk.init Nothing
-  window <- new Gtk.Window [ #title := "Botwars",
-                             #borderWidth := 10 ]
-  on window #destroy $ do
+  window <- Gtk.windowNew Gtk.WindowTypeToplevel
+  Gtk.setWindowTitle window "Botwars"
+  Gtk.onWidgetDestroy window $ do
     Gtk.mainQuit
     putMVar exitMVar ExitSuccess
-  canvas <- new Gtk.DrawingArea []
-  #setSizeRequest canvas 920 920
+  canvas <- Gtk.drawingAreaNew
+  Gtk.widgetSetSizeRequest canvas 920 920
   worldRef <- newIORef Nothing
-  on canvas #draw $ \(Context fp) -> do
+  Gtk.onWidgetDraw canvas $ \(Context fp) -> do
     withManagedPtr fp $ \p ->
       (`runReaderT` Cairo (castPtr p)) $ runRender $ do
       w <- liftIO $ fromIntegral <$> Gtk.widgetGetAllocatedWidth canvas
@@ -171,9 +171,9 @@ setup exprs params savePath = do
         Just world -> drawWorld world w h
         Nothing -> return ()
       return True
-  #add window canvas
+  Gtk.containerAdd window canvas
   gen <- newStdGen
-  #showAll window
+  Gtk.widgetShowAll window
   forkOS Gtk.main
   forkIO $ do
     mainLoop (initCont exprs params gen) savePath canvas worldRef exitMVar

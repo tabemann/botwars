@@ -128,7 +128,8 @@ defaultParams =
                 robotParamsRandomCondWeight = 0.2,
                 robotParamsRandomApplySpecialWeight = 0.75,
                 robotParamsRandomMaxDepth = 3,
-                robotParamsReproduction = Seq.fromList [5, 4],
+                robotParamsReproduction = Seq.fromList [3, 2],
+                robotParamsMutatedReproduction = Seq.fromList [3, 2],
                 robotParamsSpecialConsts = specialConsts,
                 robotParamsSpecialValueCount = specialValueCount }
 
@@ -382,6 +383,9 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
   else if name == "reproduction"
   then parseReproduction entry $
        \value -> params { robotParamsReproduction = value }
+  else if name == "mutatedReproduction"
+  then parseReproduction entry $
+       \value -> params { robotParamsMutatedReproduction = value }
   else Left . Text.pack $
        Printf.printf "%s: unknown configuration parameter" name
 loadParam (Left errorMessage) _ = Left errorMessage

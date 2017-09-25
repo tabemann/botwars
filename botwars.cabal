@@ -25,7 +25,8 @@ executable botwars
                   random -any,
                   text -any,
                   containers >=0.5.8,
-                  transformers
+                  transformers,
+                  clock
     other-modules:
                   Robots.Genetic.HunterKiller.World,
                   Robots.Genetic.HunterKiller.Save,

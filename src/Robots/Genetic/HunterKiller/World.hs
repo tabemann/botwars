@@ -27,7 +27,7 @@
 -- ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 -- POSSIBILITY OF SUCH DAMAGE.
 
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, OverloadedLists #-}
 
 module Robots.Genetic.HunterKiller.World
 
@@ -335,17 +335,15 @@ robotCycle robot = do
       shotObjects = fmap (\shot -> (shotLocation shot,
                                     shotLocationDelta shot))
                       (robotWorldShots world)
-      input = Seq.fromList [robotData robot,
-                            RobotFloat locationDeltaAbs,
-                            RobotFloat locationDeltaAngle',
-                            RobotFloat . robotRotationDelta $ robot,
-                            RobotFloat . robotGeneralEnergy $ robot,
-                            RobotFloat . robotWeaponEnergy $ robot,
-                            RobotFloat . robotHealth $ robot,
-                            RobotVector $ detect robot robotObjects
-                             (robotWorldParams world),
-                            RobotVector $ detect robot shotObjects
-                             (robotWorldParams world)]
+      input = [robotData robot,
+               RobotFloat locationDeltaAbs,
+               RobotFloat locationDeltaAngle',
+               RobotFloat . robotRotationDelta $ robot,
+               RobotFloat . robotGeneralEnergy $ robot,
+               RobotFloat . robotWeaponEnergy $ robot,
+               RobotFloat . robotHealth $ robot,
+               RobotVector $ detect robot robotObjects (robotWorldParams world),
+               RobotVector $ detect robot shotObjects (robotWorldParams world)]
   return . extractOutput $
     State.evalState (execute (RobotContext input) (robotExpr robot))
       (RobotState { robotStateParams = robotWorldParams world,
@@ -399,11 +397,10 @@ detect robot objects params =
                      Nothing -> 0.0
                  objectDistanceDelta = objectNewDistance - distance
                  objectAngleDelta = normalizeAngle $ objectNewAngle'- angle
-             in RobotVector . Seq.fromList $
-                  [RobotFloat distance,
-                   RobotFloat angle,
-                   RobotFloat objectDistanceDelta,
-                   RobotFloat objectAngleDelta])
+             in RobotVector [RobotFloat distance,
+                             RobotFloat angle,
+                             RobotFloat objectDistanceDelta,
+                             RobotFloat objectAngleDelta])
           sortedObjects'
 
 -- | Calculate a view score based on distance and angle.

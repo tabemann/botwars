@@ -27,7 +27,7 @@
 -- ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 -- POSSIBILITY OF SUCH DAMAGE.
 
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, OverloadedLists #-}
 
 module Robots.Genetic.HunterKiller.Intrinsics
 
@@ -65,71 +65,70 @@ specialConstEntries = specialValues >< intrinsics
 
 -- | Special values
 specialValues :: Seq.Seq RobotConstEntry
-specialValues = Seq.fromList [RobotConstEntry (RobotInt 0) "0",
-                              RobotConstEntry (RobotInt 1) "1",
-                              RobotConstEntry (RobotBool False) "false",
-                              RobotConstEntry (RobotBool True) "true",
-                              RobotConstEntry (RobotInt (-1)) "-1",
-                              RobotConstEntry (RobotInt 2) "2",
-                              RobotConstEntry (RobotInt (-2)) "-2",
-                              RobotConstEntry (RobotFloat 0.5) "0.5",
-                              RobotConstEntry (RobotFloat (-0.5)) "-0.5",
-                              RobotConstEntry RobotNull "null",
-                              RobotConstEntry (RobotVector Seq.empty) "empty",
-                              RobotConstEntry (RobotFloat pi) "pi",
-                              RobotConstEntry (RobotFloat (exp 1)) "e",
-                              RobotConstEntry (RobotFloat (pi * 2.0)) "pi2"]
+specialValues = [RobotConstEntry (RobotInt 0) "0",
+                 RobotConstEntry (RobotInt 1) "1",
+                 RobotConstEntry (RobotBool False) "false",
+                 RobotConstEntry (RobotBool True) "true",
+                 RobotConstEntry (RobotInt (-1)) "-1",
+                 RobotConstEntry (RobotInt 2) "2",
+                 RobotConstEntry (RobotInt (-2)) "-2",
+                 RobotConstEntry (RobotFloat 0.5) "0.5",
+                 RobotConstEntry (RobotFloat (-0.5)) "-0.5",
+                 RobotConstEntry RobotNull "null",
+                 RobotConstEntry (RobotVector Seq.empty) "empty",
+                 RobotConstEntry (RobotFloat pi) "pi",
+                 RobotConstEntry (RobotFloat (exp 1)) "e",
+                 RobotConstEntry (RobotFloat (pi * 2.0)) "pi2"]
 
 -- | Intrinsics
 intrinsics :: Seq.Seq RobotConstEntry
-intrinsics =
-  Seq.fromList [RobotConstEntry (RobotIntrinsic intrinsicEquals) "equals",
-                RobotConstEntry (RobotIntrinsic intrinsicNotEquals) "notEquals",
-                RobotConstEntry (RobotIntrinsic intrinsicGet) "get",
-                RobotConstEntry (RobotIntrinsic intrinsicSet) "set",
-                RobotConstEntry (RobotIntrinsic intrinsicLength) "length",
-                RobotConstEntry (RobotIntrinsic intrinsicCons) "cons",
-                RobotConstEntry (RobotIntrinsic intrinsicSnoc) "snoc",
-                RobotConstEntry (RobotIntrinsic intrinsicLHead) "lHead",
-                RobotConstEntry (RobotIntrinsic intrinsicLTail) "lTail",
-                RobotConstEntry (RobotIntrinsic intrinsicRHead) "rHead",
-                RobotConstEntry (RobotIntrinsic intrinsicRTail) "rTail",
-                RobotConstEntry (RobotIntrinsic intrinsicMap) "map",
-                RobotConstEntry (RobotIntrinsic intrinsicFoldl) "foldl",
-                RobotConstEntry (RobotIntrinsic intrinsicFoldr) "foldr",
-                RobotConstEntry (RobotIntrinsic intrinsicNot) "not",
-                RobotConstEntry (RobotIntrinsic intrinsicAnd) "and",
-                RobotConstEntry (RobotIntrinsic intrinsicOr) "or",
-                RobotConstEntry (RobotIntrinsic intrinsicXor) "xor",
-                RobotConstEntry (RobotIntrinsic intrinsicGT) "gt",
-                RobotConstEntry (RobotIntrinsic intrinsicLT) "lt",
-                RobotConstEntry (RobotIntrinsic intrinsicGTE) "gte",
-                RobotConstEntry (RobotIntrinsic intrinsicLTE) "lte",
-                RobotConstEntry (RobotIntrinsic intrinsicFire) "fire",
-                RobotConstEntry (RobotIntrinsic intrinsicThrust) "thrust",
-                RobotConstEntry (RobotIntrinsic intrinsicTurn) "turn",
-                RobotConstEntry (RobotIntrinsic intrinsicAdd) "add",
-                RobotConstEntry (RobotIntrinsic intrinsicSub) "sub",
-                RobotConstEntry (RobotIntrinsic intrinsicMul) "mul",
-                RobotConstEntry (RobotIntrinsic intrinsicDiv) "div",
-                RobotConstEntry (RobotIntrinsic intrinsicMod) "mod",
-                RobotConstEntry (RobotIntrinsic intrinsicPow) "pow",
-                RobotConstEntry (RobotIntrinsic intrinsicSqrt) "sqrt",
-                RobotConstEntry (RobotIntrinsic intrinsicAbs) "abs",
-                RobotConstEntry (RobotIntrinsic intrinsicExp) "exp",
-                RobotConstEntry (RobotIntrinsic intrinsicLog) "log",
-                RobotConstEntry (RobotIntrinsic intrinsicSin) "sin",
-                RobotConstEntry (RobotIntrinsic intrinsicCos) "cos",
-                RobotConstEntry (RobotIntrinsic intrinsicTan) "tan",
-                RobotConstEntry (RobotIntrinsic intrinsicAsin) "asin",
-                RobotConstEntry (RobotIntrinsic intrinsicAcos) "acos",
-                RobotConstEntry (RobotIntrinsic intrinsicAtan) "atan",
-                RobotConstEntry (RobotIntrinsic intrinsicSinh) "sinh",
-                RobotConstEntry (RobotIntrinsic intrinsicCosh) "cosh",
-                RobotConstEntry (RobotIntrinsic intrinsicTanh) "tanh",
-                RobotConstEntry (RobotIntrinsic intrinsicAsinh) "asinh",
-                RobotConstEntry (RobotIntrinsic intrinsicAcosh) "acosh",
-                RobotConstEntry (RobotIntrinsic intrinsicAtanh) "atanh"]
+intrinsics = [RobotConstEntry (RobotIntrinsic intrinsicEquals) "equals",
+              RobotConstEntry (RobotIntrinsic intrinsicNotEquals) "notEquals",
+              RobotConstEntry (RobotIntrinsic intrinsicGet) "get",
+              RobotConstEntry (RobotIntrinsic intrinsicSet) "set",
+              RobotConstEntry (RobotIntrinsic intrinsicLength) "length",
+              RobotConstEntry (RobotIntrinsic intrinsicCons) "cons",
+              RobotConstEntry (RobotIntrinsic intrinsicSnoc) "snoc",
+              RobotConstEntry (RobotIntrinsic intrinsicLHead) "lHead",
+              RobotConstEntry (RobotIntrinsic intrinsicLTail) "lTail",
+              RobotConstEntry (RobotIntrinsic intrinsicRHead) "rHead",
+              RobotConstEntry (RobotIntrinsic intrinsicRTail) "rTail",
+              RobotConstEntry (RobotIntrinsic intrinsicMap) "map",
+              RobotConstEntry (RobotIntrinsic intrinsicFoldl) "foldl",
+              RobotConstEntry (RobotIntrinsic intrinsicFoldr) "foldr",
+              RobotConstEntry (RobotIntrinsic intrinsicNot) "not",
+              RobotConstEntry (RobotIntrinsic intrinsicAnd) "and",
+              RobotConstEntry (RobotIntrinsic intrinsicOr) "or",
+              RobotConstEntry (RobotIntrinsic intrinsicXor) "xor",
+              RobotConstEntry (RobotIntrinsic intrinsicGT) "gt",
+              RobotConstEntry (RobotIntrinsic intrinsicLT) "lt",
+              RobotConstEntry (RobotIntrinsic intrinsicGTE) "gte",
+              RobotConstEntry (RobotIntrinsic intrinsicLTE) "lte",
+              RobotConstEntry (RobotIntrinsic intrinsicFire) "fire",
+              RobotConstEntry (RobotIntrinsic intrinsicThrust) "thrust",
+              RobotConstEntry (RobotIntrinsic intrinsicTurn) "turn",
+              RobotConstEntry (RobotIntrinsic intrinsicAdd) "add",
+              RobotConstEntry (RobotIntrinsic intrinsicSub) "sub",
+              RobotConstEntry (RobotIntrinsic intrinsicMul) "mul",
+              RobotConstEntry (RobotIntrinsic intrinsicDiv) "div",
+              RobotConstEntry (RobotIntrinsic intrinsicMod) "mod",
+              RobotConstEntry (RobotIntrinsic intrinsicPow) "pow",
+              RobotConstEntry (RobotIntrinsic intrinsicSqrt) "sqrt",
+              RobotConstEntry (RobotIntrinsic intrinsicAbs) "abs",
+              RobotConstEntry (RobotIntrinsic intrinsicExp) "exp",
+              RobotConstEntry (RobotIntrinsic intrinsicLog) "log",
+              RobotConstEntry (RobotIntrinsic intrinsicSin) "sin",
+              RobotConstEntry (RobotIntrinsic intrinsicCos) "cos",
+              RobotConstEntry (RobotIntrinsic intrinsicTan) "tan",
+              RobotConstEntry (RobotIntrinsic intrinsicAsin) "asin",
+              RobotConstEntry (RobotIntrinsic intrinsicAcos) "acos",
+              RobotConstEntry (RobotIntrinsic intrinsicAtan) "atan",
+              RobotConstEntry (RobotIntrinsic intrinsicSinh) "sinh",
+              RobotConstEntry (RobotIntrinsic intrinsicCosh) "cosh",
+              RobotConstEntry (RobotIntrinsic intrinsicTanh) "tanh",
+              RobotConstEntry (RobotIntrinsic intrinsicAsinh) "asinh",
+              RobotConstEntry (RobotIntrinsic intrinsicAcosh) "acosh",
+              RobotConstEntry (RobotIntrinsic intrinsicAtanh) "atanh"]
 
 -- | The equals intrinsic
 intrinsicEquals :: Seq.Seq RobotValue -> State.State RobotState RobotValue
@@ -217,7 +216,7 @@ intrinsicCons args = do
     (Just value, Just (RobotVector vector)) ->
       return . RobotVector $ value <| vector
     (Just value0, Just value1) ->
-      return . RobotVector $ Seq.fromList [value0, value1]
+      return $ RobotVector [value0, value1]
     (Just value, Nothing) ->
       return . RobotVector $ Seq.singleton value
     _ -> return . RobotVector $ Seq.empty
@@ -230,7 +229,7 @@ intrinsicSnoc args = do
     (Just (RobotVector vector), Just value) ->
       return . RobotVector $ vector |> value
     (Just value0, Just value1) ->
-      return . RobotVector $ Seq.fromList [value0, value1]
+      return $ RobotVector [value0, value1]
     (Just (RobotVector vector), Nothing) ->
       return . RobotVector $ vector
     (Just value, Nothing) ->
@@ -307,7 +306,7 @@ intrinsicFoldl args =
   case (Seq.lookup 0 args, Seq.lookup 1 args, Seq.lookup 2 args) of
     (Just func, Just start, Just (RobotVector vector)) -> do
       value <- foldlM (\current value ->
-                         apply (Seq.fromList [current, value]) func)
+                         apply [current, value] func)
                start vector
       updateStateFinish
       return value
@@ -320,7 +319,7 @@ intrinsicFoldr args =
   case (Seq.lookup 0 args, Seq.lookup 1 args, Seq.lookup 2 args) of
     (Just func, Just start, Just (RobotVector vector)) -> do
       value <- foldrM (\value current ->
-                         apply (Seq.fromList [value, current]) func)
+                         apply [value, current] func)
                start vector
       updateStateFinish
       return value

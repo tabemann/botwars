@@ -27,7 +27,7 @@
 -- ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 -- POSSIBILITY OF SUCH DAMAGE.
 
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, OverloadedLists #-}
 
 module Robots.Genetic.HunterKiller.Params
 
@@ -130,8 +130,8 @@ defaultParams =
                 robotParamsRandomCondWeight = 0.2,
                 robotParamsRandomApplySpecialWeight = 0.75,
                 robotParamsRandomMaxDepth = 3,
-                robotParamsReproduction = Seq.fromList [3, 2],
-                robotParamsMutatedReproduction = Seq.fromList [3, 2],
+                robotParamsReproduction = [3, 2],
+                robotParamsMutatedReproduction = [3, 2],
                 robotParamsSpecialConsts = specialConsts,
                 robotParamsSpecialValueCount = specialValueCount }
 

@@ -27,7 +27,7 @@
 -- ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 -- POSSIBILITY OF SUCH DAMAGE.
 
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, OverloadedLists #-}
 
 module Robots.Genetic.HunterKiller.Save
 
@@ -65,8 +65,7 @@ outputExpr _ firstIndent nextIndex (RobotConst value) =
   in indentText firstIndent $ "const " <| valueText
 outputExpr consts firstIndent _ (RobotSpecialConst index) =
   case Seq.lookup index consts of
-    Just (RobotConstEntry _ name) ->
-      indentText firstIndent $ Seq.fromList ["special ", name]
+    Just (RobotConstEntry _ name) -> indentText firstIndent ["special ", name]
     Nothing -> error "this should be impossible"
 outputExpr consts firstIndex nextIndex (RobotBind boundExprs expr) =
   indentText firstIndex (Seq.singleton "bind\n") ><

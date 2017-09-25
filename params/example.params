@@ -1,4 +1,4 @@
-cycleDelay = 10000
+maxCyclesPerSecond = 100.0
 locationFriction = 0.03
 rotationFriction = 0.005
 minInitialLocationDeltaAbs = 0

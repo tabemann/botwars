@@ -48,15 +48,28 @@ drawWorld world w h = do
 drawRobot :: Double -> Double -> RobotParams -> Robot -> Cairo.Render ()
 drawRobot w h params robot = do
   Cairo.setLineWidth 1.0
-  Cairo.setSourceRGB 0.0 0.0 0.0
   let (centerX, centerY) = convertCoord (robotLocation robot) w h
   let radius = robotParamsRobotRadius params
+  Cairo.arc centerX centerY (radius * w * robotParamsOversizeRadius params)
+    0.0 (2.0 * pi)
+  Cairo.setSourceRGB (1.0 - ((1.0 - robotHealth robot) / 2.0))
+    (1.0 - ((1.0 - robotGeneralEnergy robot) / 2.0))
+    (1.0 - ((1.0 - robotGeneralEnergy robot) / 2.0))
+  Cairo.fill
   Cairo.arc centerX centerY (radius * w) 0.0 (2.0 * pi)
-  Cairo.moveTo centerX centerY
+  Cairo.setSourceRGB (robotHealth robot) (robotGeneralEnergy robot)
+    (robotWeaponEnergy robot)
+  Cairo.fill
+  Cairo.setSourceRGB 0.0 0.0 0.0
+  Cairo.arc centerX centerY (radius * w * robotParamsOversizeRadius params)
+    0.0 (2.0 * pi)
+  Cairo.stroke
   let rotation = robotRotation robot
   let (endX, endY) = convertCoord (addVector (robotLocation robot)
-                                   (mulVector (2.0 * radius)
+                                   (mulVector
+                                    (robotParamsAimRadius params * radius)
                                     (cos rotation, sin rotation))) w h
+  Cairo.moveTo centerX centerY
   Cairo.lineTo endX endY
   Cairo.stroke
 

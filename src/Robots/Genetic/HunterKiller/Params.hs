@@ -54,7 +54,9 @@ import Text.Printf as Printf
 -- | Default parameters
 defaultParams :: RobotParams
 defaultParams =
-  RobotParams { robotParamsCycleDelay = 10000,
+  RobotParams { robotParamsMaxCyclesPerSecond = 100.0,
+                robotParamsOversizeRadius = 2.0,
+                robotParamsAimRadius = 4.0,
                 robotParamsLocationFriction = 0.03,
                 robotParamsRotationFriction = 0.005,
                 robotParamsFireFactor = 2.0,
@@ -144,9 +146,15 @@ loadParams text =
 loadParam :: Either Text.Text RobotParams -> RobotConfigEntry ->
              Either Text.Text RobotParams
 loadParam (Right params) entry@(RobotConfigEntry name _) =
-  if name ==  "cycleDelay"
-  then parseLoBoundInt 0 entry $
-       \value -> params { robotParamsCycleDelay = value }
+  if name ==  "maxCyclesPerSecond"
+  then parseLoBoundFloat 0.0 entry $
+       \value -> params { robotParamsMaxCyclesPerSecond = value }
+  else if name == "oversizeRadius"
+  then parseLoBoundFloat 0.0 entry $
+       \value -> params { robotParamsOversizeRadius = value }
+  else if name == "aimRadius"
+  then parseLoBoundFloat 0.0 entry $
+       \value -> params { robotParamsAimRadius = value }
   else if name == "locationFriction"
   then parseBoundFloat (0.0, 1.0) entry $
        \value -> params { robotParamsLocationFriction = value }

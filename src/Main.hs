@@ -88,6 +88,7 @@ import GI.GLib (idleAdd,
                 pattern PRIORITY_DEFAULT,
                 pattern PRIORITY_HIGH)
 import GI.Gdk.Objects.Window
+import qualified System.Clock as Clock
 
 -- | The main action.
 main :: IO ()
@@ -176,15 +177,17 @@ setup exprs params savePath = do
   Gtk.widgetShowAll window
   forkOS Gtk.main
   forkIO $ do
+    time <- Clock.getTime Clock.Monotonic
     mainLoop (initCont exprs params gen) savePath canvas worldRef exitMVar
-      reallyExitMVar
+      reallyExitMVar time
   exitStatus <- takeMVar reallyExitMVar
   exitWith exitStatus 
 
 -- | Execute the main loop of the genetically-programmed robot fighting arena.
 mainLoop :: RobotCont -> FilePath -> Gtk.DrawingArea ->
-            IORef (Maybe RobotWorld) -> MVar ExitCode -> MVar ExitCode -> IO ()
-mainLoop cont savePath canvas worldRef exitMVar reallyExitMVar = do
+            IORef (Maybe RobotWorld) -> MVar ExitCode -> MVar ExitCode ->
+            Clock.TimeSpec -> IO ()
+mainLoop cont savePath canvas worldRef exitMVar reallyExitMVar nextTime = do
   let (event, cont') = executeCycle cont
       world = case event of
         RobotWorldCycle world -> world
@@ -214,8 +217,22 @@ mainLoop cont savePath canvas worldRef exitMVar reallyExitMVar = do
         RobotRoundDone _ ->
           saveWorldToFile (savePath ++ ".prev") world >> return ()
         _ -> return ()
-      threadDelay . robotParamsCycleDelay $ robotWorldParams world
-      mainLoop cont' savePath canvas worldRef exitMVar reallyExitMVar
+      time <- Clock.getTime Clock.Monotonic
+      let maxCyclesPerSecond =
+            robotParamsMaxCyclesPerSecond $ robotWorldParams world
+          maxDelay =
+            Clock.fromNanoSecs . floor $ 1000000000.0 / maxCyclesPerSecond
+          nextTime' = nextTime + maxDelay
+      if time < nextTime'
+        then threadDelay . fromIntegral $
+             (Clock.toNanoSecs (nextTime' - time)) `div` 1000
+        else return ()
+      let nextTime'' =
+            if time - nextTime > (Clock.fromNanoSecs . floor $
+                                  2000000000.0 / maxCyclesPerSecond)
+            then time
+            else nextTime'
+      mainLoop cont' savePath canvas worldRef exitMVar reallyExitMVar nextTime''
     Just exitStatus -> do
       status <- saveWorldToFile savePath world
       case status of

@@ -346,7 +346,7 @@ randomApply contextDepth randomDepth totalDepth = do
   argExprs <- Seq.replicateM argCount
               (randomExpr' contextDepth (randomDepth + 1) (totalDepth + 1))
   applySpecialValue <- random
-  if applySpecialValue < applySpecialWeight
+  if applySpecialValue <= applySpecialWeight
     then RobotApply argExprs <$> randomIntrinsic
     else RobotApply argExprs <$>
          randomExpr' contextDepth (randomDepth + 1) (totalDepth + 1)

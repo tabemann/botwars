@@ -303,6 +303,8 @@ mainLoop cont canvas worldRef controlMVar exitMVar nextTime play = do
         Nothing -> return ()
       mainLoop cont canvas worldRef controlMVar exitMVar nextTime play
     Nothing -> do
+      let displayInfo =
+            robotPlayRunning play || (robotPlayDoStep play /= RobotNoStep)
       (cont', world, play) <- nextState cont play
       writeIORef worldRef (Just world)
       Gdk.threadsAddIdle PRIORITY_HIGH $ do
@@ -311,17 +313,20 @@ mainLoop cont canvas worldRef controlMVar exitMVar nextTime play = do
           Just window -> #invalidateRect window Nothing True
           Nothing -> return ()
         return False
-      let robotDisplay =
-            Text.concat
-            (toList (fmap (\robot ->
-                             Text.pack $ printf "%d " (robotIndex robot))
-                      (robotWorldRobots world)))
-          shotDisplay =
-            Text.concat
-            (toList (fmap (\shot ->
-                             Text.pack $ printf "%d " (shotRobotIndex shot))
-                      (robotWorldShots world)))
-      putStr $ printf "Robots: %sShots: %s\n" robotDisplay shotDisplay
+      if displayInfo
+        then do
+          let robotDisplay =
+                Text.concat
+                (toList (fmap (\robot ->
+                                 Text.pack $ printf "%d " (robotIndex robot))
+                         (robotWorldRobots world)))
+              shotDisplay =
+                Text.concat
+                (toList (fmap (\shot ->
+                                 Text.pack $ printf "%d " (shotRobotIndex shot))
+                         (robotWorldShots world)))
+          putStr $ printf "Robots: %sShots: %s\n" robotDisplay shotDisplay
+        else return ()
       time <- Clock.getTime Clock.Monotonic
       let cyclesPerSecond =
             if robotPlayRunning play

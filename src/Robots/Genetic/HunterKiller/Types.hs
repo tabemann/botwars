@@ -66,6 +66,7 @@ data RobotControl = RobotExit
                   | RobotForward
                   | RobotBackward
                   | RobotSave FilePath
+                  deriving (Eq)
 
 -- | Robot play control state type
 data RobotPlay =
@@ -77,6 +78,7 @@ data RobotPlay =
 
 -- | Robot step setting.
 data RobotStep = RobotStepForward | RobotStepBackward | RobotNoStep
+               deriving (Eq)
 
 -- | Robot continuity type
 data RobotCont =

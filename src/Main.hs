@@ -53,7 +53,8 @@ import System.Exit (exitWith,
 import qualified Data.Sequence as Seq
 import Data.Sequence ((><))
 import qualified Data.Text as Text
-import qualified Data.Text.IO as TextIO
+import Data.Text.IO (hPutStr,
+                     readFile)
 import System.IO (stderr,
                   openFile,
                   hClose,
@@ -89,30 +90,32 @@ import GI.GLib (idleAdd,
                 pattern PRIORITY_HIGH)
 import GI.Gdk.Objects.Window
 import qualified System.Clock as Clock
+import Prelude hiding (hPutStr,
+                       readFile)
 
 -- | The main action.
 main :: IO ()
 main = do
   inputs <- getInputs
   case inputs of
-    Right (exprs, params, savePath) -> setup exprs params savePath
+    Right (exprs, params) -> setup exprs params
     Left errorText -> do
-      TextIO.hPutStr stderr errorText
+      hPutStr stderr errorText
       exitFailure
 
 -- | Get inputs.
-getInputs :: IO (Either Text.Text (Seq.Seq RobotExpr, RobotParams, FilePath))
+getInputs :: IO (Either Text.Text (Seq.Seq RobotExpr, RobotParams))
 getInputs = do
   args <- getArgs
   case args of
-    [worldPath, worldCopiesText, paramsPath, savePath] -> do
+    [worldPath, worldCopiesText, paramsPath] -> do
       paramsText <-
-        catch (Right <$> TextIO.readFile paramsPath)
+        catch (Right <$> readFile paramsPath)
               (\e -> return . Left . Text.pack $ show (e :: IOException))
       case paramsText of
         Right paramsText -> do
           worldText <-
-            catch (Right <$> TextIO.readFile worldPath)
+            catch (Right <$> readFile worldPath)
                   (\e -> return . Left . Text.pack $ show (e :: IOException))
           case worldText of
             Right worldText ->
@@ -128,7 +131,7 @@ getInputs = do
                           then return $ Right
                                (foldl' (><) Seq.empty $
                                  Seq.replicate worldCopies exprs,
-                                 params, savePath)
+                                 params)
                           else return $ Left
                                "number of copies must be greater than zero\n"
                         Nothing -> return $ Left "invalid number of copies\n"
@@ -146,19 +149,21 @@ getInputs = do
           return . Left . Text.pack $ printf "%s: %s\n" paramsPath errorText
     _ -> do progName <- getProgName
             return . Left . Text.pack $
-              printf "Usage: %s WORLD-FILE COUNT PARAMS-FILE SAVE-FILE\n" progName
+              printf "Usage: %s WORLD-FILE COUNT PARAMS-FILE\n" progName
 
 -- | Set up the UI and prepare for running.
-setup :: Seq.Seq RobotExpr -> RobotParams -> FilePath -> IO ()
-setup exprs params savePath = do
+setup :: Seq.Seq RobotExpr -> RobotParams -> IO ()
+setup exprs params = do
+  controlMVar <- newEmptyMVar
   exitMVar <- newEmptyMVar
-  reallyExitMVar <- newEmptyMVar
   Gtk.init Nothing
   window <- Gtk.windowNew Gtk.WindowTypeToplevel
   Gtk.setWindowTitle window "Botwars"
   Gtk.onWidgetDestroy window $ do
     Gtk.mainQuit
-    putMVar exitMVar ExitSuccess
+    putMVar controlMVar RobotExit
+  vbox <- Gtk.boxNew Gtk.OrientationVertical 10
+  Gtk.boxSetHomogeneous vbox False
   canvas <- Gtk.drawingAreaNew
   Gtk.widgetSetSizeRequest canvas 920 920
   worldRef <- newIORef Nothing
@@ -172,29 +177,133 @@ setup exprs params savePath = do
         Just world -> drawWorld world w h
         Nothing -> return ()
       return True
-  Gtk.containerAdd window canvas
+  Gtk.boxPackStart vbox canvas True True 0
+  buttonBox <- Gtk.buttonBoxNew Gtk.OrientationHorizontal
+  Gtk.buttonBoxSetLayout buttonBox Gtk.ButtonBoxStyleCenter
+  backwardButton <- Gtk.buttonNew
+  stopButton <- Gtk.buttonNew
+  startButton <- Gtk.buttonNew
+  forwardButton <- Gtk.buttonNew
+  saveButton <- Gtk.buttonNew
+  Gtk.buttonSetLabel backwardButton "<<"
+  Gtk.buttonSetLabel stopButton "Stop"
+  Gtk.buttonSetLabel startButton "Start"
+  Gtk.buttonSetLabel forwardButton ">>"
+  Gtk.buttonSetLabel saveButton "Save"
+  Gtk.onButtonClicked backwardButton $ putMVar controlMVar RobotBackward
+  Gtk.onButtonClicked stopButton $ putMVar controlMVar RobotStop
+  Gtk.onButtonClicked startButton $ putMVar controlMVar RobotStart
+  Gtk.onButtonClicked forwardButton $ putMVar controlMVar RobotForward
+  Gtk.onButtonClicked saveButton $ do
+    fileChooser <- Gtk.fileChooserNativeNew (Just "Save As World")
+      (Just window) Gtk.FileChooserActionSave Nothing
+      Nothing
+    result <- toEnum <$> fromIntegral <$> Gtk.nativeDialogRun fileChooser
+    case result of
+      Gtk.ResponseTypeAccept -> do
+        filename <- Gtk.fileChooserGetFilename fileChooser
+        case filename of
+          Just filename -> putMVar controlMVar (RobotSave filename)
+          Nothing -> return ()
+      _ -> return ()
+  Gtk.boxPackStart buttonBox backwardButton False False 0
+  Gtk.boxPackStart buttonBox stopButton False False 0
+  Gtk.boxPackStart buttonBox startButton False False 0
+  Gtk.boxPackStart buttonBox forwardButton False False 0
+  Gtk.boxPackStart buttonBox saveButton False False 0
+  Gtk.boxPackEnd vbox buttonBox False False 0
+  Gtk.containerAdd window vbox
   gen <- newStdGen
   Gtk.widgetShowAll window
   forkOS Gtk.main
   forkIO $ do
     time <- Clock.getTime Clock.Monotonic
-    mainLoop (initCont exprs params gen) savePath canvas worldRef exitMVar
-      reallyExitMVar time
-  exitStatus <- takeMVar reallyExitMVar
+    let play =
+          RobotPlay { robotPlayCyclesPerSecond =
+                      robotParamsMaxCyclesPerSecond params,
+                      robotPlayRunning = False,
+                      robotPlayReverse = False,
+                      robotPlayIndex = 0,
+                      robotPlayDoStep = RobotNoStep }
+    mainLoop (initCont exprs params gen) canvas worldRef controlMVar
+      exitMVar time play
+  exitStatus <- takeMVar exitMVar
   exitWith exitStatus 
 
 -- | Execute the main loop of the genetically-programmed robot fighting arena.
-mainLoop :: RobotCont -> FilePath -> Gtk.DrawingArea ->
-            IORef (Maybe RobotWorld) -> MVar ExitCode -> MVar ExitCode ->
-            Clock.TimeSpec -> IO ()
-mainLoop cont savePath canvas worldRef exitMVar reallyExitMVar nextTime = do
-  let (event, cont') = executeCycle cont
-      world = case event of
-        RobotWorldCycle world -> world
-        RobotRoundDone world -> world
-  exitStatus <- tryTakeMVar exitMVar
-  case exitStatus of
+mainLoop :: RobotCont -> Gtk.DrawingArea -> IORef (Maybe RobotWorld) ->
+            MVar RobotControl -> MVar ExitCode -> Clock.TimeSpec ->
+            RobotPlay -> IO ()
+mainLoop cont canvas worldRef controlMVar exitMVar nextTime play = do
+  let params = robotContParams cont
+  control <- tryTakeMVar controlMVar
+  case control of
+    Just RobotExit -> putMVar exitMVar ExitSuccess
+    Just RobotStart ->
+      let play' = play { robotPlayRunning = True }
+      in mainLoop cont canvas worldRef controlMVar exitMVar nextTime play'
+    Just RobotStop ->
+      let play' = play { robotPlayRunning = False }
+      in mainLoop cont canvas worldRef controlMVar exitMVar nextTime play'
+    Just RobotForward ->
+      let play' =
+            if robotPlayRunning play
+            then if robotPlayReverse play
+                 then
+                   let newCyclesPerSecond = robotPlayCyclesPerSecond play / 2.0
+                   in if newCyclesPerSecond >=
+                         robotParamsMaxCyclesPerSecond params / 32.0
+                      then play { robotPlayCyclesPerSecond =
+                                    newCyclesPerSecond }
+                      else play { robotPlayReverse = False,
+                                  robotPlayCyclesPerSecond =
+                                    robotParamsMaxCyclesPerSecond params / 32.0
+                                }
+                 else
+                   let newCyclesPerSecond = robotPlayCyclesPerSecond play * 2.0
+                   in if newCyclesPerSecond <=
+                         robotParamsMaxCyclesPerSecond params
+                      then play { robotPlayCyclesPerSecond =
+                                    newCyclesPerSecond }
+                      else play { robotPlayCyclesPerSecond =
+                                    robotParamsMaxCyclesPerSecond params }
+            else play { robotPlayDoStep = RobotStepForward }
+      in mainLoop cont canvas worldRef controlMVar exitMVar nextTime play'
+    Just RobotBackward ->
+      let play' =
+            if robotPlayRunning play
+            then if robotPlayReverse play
+                 then
+                   let newCyclesPerSecond = robotPlayCyclesPerSecond play * 2.0
+                   in if newCyclesPerSecond <=
+                         robotParamsMaxCyclesPerSecond params
+                      then play { robotPlayCyclesPerSecond =
+                                    newCyclesPerSecond }
+                      else play { robotPlayCyclesPerSecond =
+                                    robotParamsMaxCyclesPerSecond params }
+                 else
+                   let newCyclesPerSecond = robotPlayCyclesPerSecond play / 2.0
+                   in if newCyclesPerSecond >=
+                         robotParamsMaxCyclesPerSecond params / 32.0
+                      then play { robotPlayCyclesPerSecond =
+                                    newCyclesPerSecond }
+                      else play { robotPlayReverse = True,
+                                  robotPlayCyclesPerSecond =
+                                    robotParamsMaxCyclesPerSecond params / 32.0
+                                }
+            else play { robotPlayDoStep = RobotStepBackward }
+      in mainLoop cont canvas worldRef controlMVar exitMVar nextTime play'
+    Just (RobotSave path) -> do
+      case robotContWorld cont of
+        Just world -> do
+          message <- saveWorldToFile path world
+          case message of
+            Left errorText -> hPutStr stderr errorText
+            Right () -> return ()
+        Nothing -> return ()
+      mainLoop cont canvas worldRef controlMVar exitMVar nextTime play
     Nothing -> do
+      (cont', world, play) <- nextState cont play
       writeIORef worldRef (Just world)
       Gdk.threadsAddIdle PRIORITY_HIGH $ do
         window <- #getWindow canvas
@@ -213,15 +322,13 @@ mainLoop cont savePath canvas worldRef exitMVar reallyExitMVar nextTime = do
                              Text.pack $ printf "%d " (shotRobotIndex shot))
                       (robotWorldShots world)))
       putStr $ printf "Robots: %sShots: %s\n" robotDisplay shotDisplay
-      case event of
-        RobotRoundDone _ ->
-          saveWorldToFile (savePath ++ ".prev") world >> return ()
-        _ -> return ()
       time <- Clock.getTime Clock.Monotonic
-      let maxCyclesPerSecond =
-            robotParamsMaxCyclesPerSecond $ robotWorldParams world
+      let cyclesPerSecond =
+            if robotPlayRunning play
+            then robotPlayCyclesPerSecond play
+            else robotParamsMaxCyclesPerSecond params
           maxDelay =
-            Clock.fromNanoSecs . floor $ 1000000000.0 / maxCyclesPerSecond
+            Clock.fromNanoSecs . floor $ 1000000000.0 / cyclesPerSecond
           nextTime' = nextTime + maxDelay
       if time < nextTime'
         then threadDelay . fromIntegral $
@@ -229,18 +336,137 @@ mainLoop cont savePath canvas worldRef exitMVar reallyExitMVar nextTime = do
         else return ()
       let nextTime'' =
             if time - nextTime > (Clock.fromNanoSecs . floor $
-                                  2000000000.0 / maxCyclesPerSecond)
+                                  2000000000.0 / cyclesPerSecond)
             then time
             else nextTime'
-      mainLoop cont' savePath canvas worldRef exitMVar reallyExitMVar nextTime''
-    Just exitStatus -> do
-      status <- saveWorldToFile savePath world
-      case status of
-        Right () -> return ()
-        Left errorText -> do
-          TextIO.hPutStr stderr errorText
-          exitFailure
-      putMVar reallyExitMVar exitStatus
+      mainLoop cont' canvas worldRef controlMVar exitMVar nextTime'' play
+
+-- | Get a new continuity, world, and play control state.
+nextState :: RobotCont -> RobotPlay -> IO (RobotCont, RobotWorld, RobotPlay)
+nextState cont play =
+  if robotPlayRunning play
+  then if not $ robotPlayReverse play
+       then if robotPlayIndex play >= -1
+            then do
+              let (event, cont') = executeCycle cont
+                  play' = play { robotPlayIndex = 0 }
+              world <- case event of
+                RobotWorldCycle world -> return world
+                RobotRoundDone world -> do
+                  saveWorldToFile "backup.world" world >> return ()
+                  return world
+              return (cont', world, play')
+            else
+              let index = robotPlayIndex play + 1
+                  prevWorlds = robotContPrevWorlds cont
+                  world =
+                    case Seq.lookup (Seq.length prevWorlds + index)
+                         prevWorlds of
+                      Just world -> world
+                      Nothing -> error "impossible"
+                  play' = play { robotPlayIndex = index }
+              in return (cont, world, play')
+       else
+         let prevWorlds = robotContPrevWorlds cont in
+           if robotPlayIndex play >= -(Seq.length prevWorlds - 1)
+           then
+             let index = robotPlayIndex play - 1
+                 world =
+                   case Seq.lookup (Seq.length prevWorlds + index)
+                        prevWorlds of
+                     Just world -> world
+                     Nothing -> error "impossible"
+                 play' = play { robotPlayIndex = index }
+             in return (cont, world, play')
+           else
+             let play' = play { robotPlayRunning = False,
+                                robotPlayReverse = False }
+                 world =
+                   case Seq.lookup (Seq.length prevWorlds +
+                                     robotPlayIndex play') prevWorlds of
+                     Just world -> world
+                     Nothing -> error "impossible"
+             in return (cont, world, play')
+  else
+    case robotPlayDoStep play of
+      RobotStepForward ->
+        if robotPlayIndex play >= -1
+        then do
+          let (event, cont') = executeCycle cont
+              play' = play { robotPlayIndex = 0,
+                             robotPlayDoStep = RobotNoStep }
+          world <- case event of
+            RobotWorldCycle world -> return world
+            RobotRoundDone world -> do
+              saveWorldToFile "backup.world" world >> return ()
+              return world
+          return (cont', world, play')
+        else
+          let index = robotPlayIndex play + 1
+              prevWorlds = robotContPrevWorlds cont
+              world =
+                case Seq.lookup (Seq.length prevWorlds + index)
+                     prevWorlds of
+                  Just world -> world
+                  Nothing -> error "impossible"
+              play' = play { robotPlayIndex = index,
+                             robotPlayDoStep = RobotNoStep }
+          in return (cont, world, play')
+      RobotStepBackward ->
+        let prevWorlds = robotContPrevWorlds cont in
+          if robotPlayIndex play >= -(Seq.length prevWorlds - 1)
+          then
+            let index = robotPlayIndex play - 1
+                world =
+                  case Seq.lookup (Seq.length prevWorlds + index)
+                       prevWorlds of
+                    Just world -> world
+                    Nothing -> error "impossible"
+                play' = play { robotPlayIndex = index,
+                               robotPlayDoStep = RobotNoStep }
+            in return (cont, world, play')
+          else
+            let play' = play { robotPlayDoStep = RobotNoStep } in
+            if robotPlayIndex play' < 0 then
+              let world =
+                    case Seq.lookup (Seq.length prevWorlds +
+                                      robotPlayIndex play') prevWorlds of
+                      Just world -> world
+                      Nothing -> error "impossible"
+              in return (cont, world, play)
+            else
+              case robotContWorld cont of
+                Just world -> return (cont, world, play')
+                Nothing -> do
+                  let (event, cont') = executeCycle cont
+                      play'' = play' { robotPlayIndex = 0 }
+                  world <- case event of
+                    RobotWorldCycle world -> return world
+                    RobotRoundDone world -> do
+                      saveWorldToFile "backup.world" world >> return ()
+                      return world
+                  return (cont', world, play'')
+      RobotNoStep ->
+        if robotPlayIndex play >= 0
+        then
+          case robotContWorld cont of
+            Just world -> return (cont, world, play)
+            Nothing -> do
+              let (event, cont') = executeCycle cont
+              world <- case event of
+                RobotWorldCycle world -> return world
+                RobotRoundDone world -> do
+                  saveWorldToFile "backup.world" world >> return ()
+                  return world
+              return (cont', world, play)
+        else do
+          let prevWorlds = robotContPrevWorlds cont
+              world =
+                case Seq.lookup (Seq.length prevWorlds + robotPlayIndex play)
+                     prevWorlds of
+                  Just world -> world
+                  Nothing -> error "impossible"
+          return (cont, world, play)
 
 -- | Save a world.
 saveWorldToFile :: FilePath -> RobotWorld -> IO (Either Text.Text ())
@@ -251,7 +477,7 @@ saveWorldToFile path world = do
               (\e -> return . Left . Text.pack $ show (e :: IOException))
   case saveFile of
     Right saveFile -> do
-      TextIO.hPutStr saveFile worldText
+      hPutStr saveFile worldText
       hClose saveFile
       return $ Right ()
     Left errorText -> do

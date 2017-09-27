@@ -58,6 +58,7 @@ initCont programs params gen = do
   RobotCont { robotContParams = params,
               robotContRandom = gen,
               robotContWorld = Nothing,
+              robotContPrevWorlds = Seq.empty,
               robotContPrograms = programs,
               robotContSavedWorlds = Seq.empty }
 
@@ -77,12 +78,25 @@ executeCycle cont =
           let (cycleState, !world') = State.runState worldCycle world
           in case cycleState of
                RobotNextCycle -> do
-                 State.modify $ \cont -> cont { robotContWorld = Just world' }
+                 State.modify (updateCont world')
                  return $ RobotWorldCycle world'
                RobotEndRound -> do
-                 State.modify $ \cont -> cont { robotContWorld = Just world' }
+                 State.modify (updateCont world')
                  startNextRound
                  return $ RobotRoundDone world'
+    updateCont world cont =
+      cont { robotContWorld = Just world,
+             robotContPrevWorlds =
+               let maxRewind = robotParamsMaxRewind $ robotContParams cont
+               in case robotContWorld cont of
+                 Just prevWorld ->
+                   let prevWorlds =
+                         robotContPrevWorlds cont |> cleanupWorld prevWorld
+                   in if Seq.length prevWorlds > maxRewind
+                      then Seq.drop (Seq.length prevWorlds - maxRewind)
+                           prevWorlds
+                      else prevWorlds
+                 Nothing -> Seq.empty }
                  
 -- | Start the next round
 startNextRound :: State.State RobotCont ()

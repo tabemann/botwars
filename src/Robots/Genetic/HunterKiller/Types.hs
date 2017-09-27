@@ -31,7 +31,10 @@
 
 module Robots.Genetic.HunterKiller.Types
   
-  (RobotWorld (..),
+  (RobotControl (..),
+   RobotPlay (..),
+   RobotStep (..),
+   RobotWorld (..),
    RobotCont (..),
    RobotMutate (..),
    RobotParams (..),
@@ -45,7 +48,6 @@ module Robots.Genetic.HunterKiller.Types
    RobotContext (..),
    RobotAction (..),
    RobotEvent (..),
-   RobotInput (..),
    RobotCycleState (..),
    RobotConfigEntry (..),
    RobotConfigValue (..))
@@ -57,12 +59,32 @@ import qualified Data.Text as Text
 import qualified Control.Monad.State.Strict as State
 import qualified System.Random as Random
 
+-- | Robot control type
+data RobotControl = RobotExit
+                  | RobotStart
+                  | RobotStop
+                  | RobotForward
+                  | RobotBackward
+                  | RobotSave FilePath
+
+-- | Robot play control state type
+data RobotPlay =
+  RobotPlay { robotPlayCyclesPerSecond :: !Double,
+              robotPlayRunning :: !Bool,
+              robotPlayReverse :: !Bool,
+              robotPlayIndex :: !Int,
+              robotPlayDoStep :: !RobotStep }
+
+-- | Robot step setting.
+data RobotStep = RobotStepForward | RobotStepBackward | RobotNoStep
+
 -- | Robot continuity type
 data RobotCont =
   RobotCont { robotContParams :: !RobotParams,
               robotContRandom :: !Random.StdGen,
               robotContWorld :: !(Maybe RobotWorld),
               robotContPrograms :: !(Seq.Seq RobotExpr),
+              robotContPrevWorlds :: !(Seq.Seq RobotWorld),
               robotContSavedWorlds :: !(Seq.Seq RobotWorld) }
 
 -- | Robot world type
@@ -102,6 +124,7 @@ data RobotParams =
                 robotParamsMinKills :: !Int,
                 robotParamsMaxCodeDepth :: !Int,
                 robotParamsSavedWorldCount :: !Int,
+                robotParamsMaxRewind :: !Int,
                 robotParamsViewAngle :: !Double,
                 robotParamsViewDistance :: !Double,
                 robotParamsViewSortAngleFactor :: !Double,
@@ -228,10 +251,6 @@ data RobotAction =
 -- | Robot event
 data RobotEvent = RobotWorldCycle !RobotWorld
                 | RobotRoundDone !RobotWorld
-
--- | Robot input
-data RobotInput = RobotContinue
-                | RobotExit
 
 -- | Robot cycle state
 data RobotCycleState = RobotNextCycle

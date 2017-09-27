@@ -73,6 +73,7 @@ defaultParams =
                 robotParamsMinKills = 50,
                 robotParamsMaxCodeDepth = 25,
                 robotParamsSavedWorldCount = 10,
+                robotParamsMaxRewind = 10000,
                 robotParamsMaxInstrCount = 1000,
                 robotParamsViewAngle = pi / 3.0,
                 robotParamsViewDistance = 0.45,
@@ -206,6 +207,9 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
   else if name == "savedWorldCount"
   then parseLoBoundInt 0 entry $
        \value -> params { robotParamsSavedWorldCount = value }
+  else if name == "maxRewind"
+  then parseLoBoundInt 0 entry $
+       \value -> params { robotParamsMaxRewind = value }
   else if name == "viewAngle"
   then parseLoBoundFloat 0.0 entry $
        \value -> params { robotParamsViewAngle = value }

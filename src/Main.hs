@@ -228,7 +228,7 @@ setup exprs params = do
     mainLoop (initCont exprs params gen) canvas worldRef controlMVar
       exitMVar time play
   exitStatus <- takeMVar exitMVar
-  exitWith exitStatus 
+  exitWith exitStatus
 
 -- | Execute the main loop of the genetically-programmed robot fighting arena.
 mainLoop :: RobotCont -> Gtk.DrawingArea -> IORef (Maybe RobotWorld) ->
@@ -239,60 +239,6 @@ mainLoop cont canvas worldRef controlMVar exitMVar nextTime play = do
   control <- tryTakeMVar controlMVar
   case control of
     Just RobotExit -> putMVar exitMVar ExitSuccess
-    Just RobotStart ->
-      let play' = play { robotPlayRunning = True }
-      in mainLoop cont canvas worldRef controlMVar exitMVar nextTime play'
-    Just RobotStop ->
-      let play' = play { robotPlayRunning = False }
-      in mainLoop cont canvas worldRef controlMVar exitMVar nextTime play'
-    Just RobotForward ->
-      let play' =
-            if robotPlayRunning play
-            then if robotPlayReverse play
-                 then
-                   let newCyclesPerSecond = robotPlayCyclesPerSecond play / 2.0
-                   in if newCyclesPerSecond >=
-                         robotParamsMaxCyclesPerSecond params / 32.0
-                      then play { robotPlayCyclesPerSecond =
-                                    newCyclesPerSecond }
-                      else play { robotPlayReverse = False,
-                                  robotPlayCyclesPerSecond =
-                                    robotParamsMaxCyclesPerSecond params / 32.0
-                                }
-                 else
-                   let newCyclesPerSecond = robotPlayCyclesPerSecond play * 2.0
-                   in if newCyclesPerSecond <=
-                         robotParamsMaxCyclesPerSecond params
-                      then play { robotPlayCyclesPerSecond =
-                                    newCyclesPerSecond }
-                      else play { robotPlayCyclesPerSecond =
-                                    robotParamsMaxCyclesPerSecond params }
-            else play { robotPlayDoStep = RobotStepForward }
-      in mainLoop cont canvas worldRef controlMVar exitMVar nextTime play'
-    Just RobotBackward ->
-      let play' =
-            if robotPlayRunning play
-            then if robotPlayReverse play
-                 then
-                   let newCyclesPerSecond = robotPlayCyclesPerSecond play * 2.0
-                   in if newCyclesPerSecond <=
-                         robotParamsMaxCyclesPerSecond params
-                      then play { robotPlayCyclesPerSecond =
-                                    newCyclesPerSecond }
-                      else play { robotPlayCyclesPerSecond =
-                                    robotParamsMaxCyclesPerSecond params }
-                 else
-                   let newCyclesPerSecond = robotPlayCyclesPerSecond play / 2.0
-                   in if newCyclesPerSecond >=
-                         robotParamsMaxCyclesPerSecond params / 32.0
-                      then play { robotPlayCyclesPerSecond =
-                                    newCyclesPerSecond }
-                      else play { robotPlayReverse = True,
-                                  robotPlayCyclesPerSecond =
-                                    robotParamsMaxCyclesPerSecond params / 32.0
-                                }
-            else play { robotPlayDoStep = RobotStepBackward }
-      in mainLoop cont canvas worldRef controlMVar exitMVar nextTime play'
     Just (RobotSave path) -> do
       case robotContWorld cont of
         Just world -> do
@@ -302,6 +248,9 @@ mainLoop cont canvas worldRef controlMVar exitMVar nextTime play = do
             Right () -> return ()
         Nothing -> return ()
       mainLoop cont canvas worldRef controlMVar exitMVar nextTime play
+    Just control ->
+      let play' = changePlay control play params
+      in mainLoop cont canvas worldRef controlMVar exitMVar nextTime play'
     Nothing -> do
       let displayInfo =
             robotPlayRunning play || (robotPlayDoStep play /= RobotNoStep)
@@ -345,6 +294,47 @@ mainLoop cont canvas worldRef controlMVar exitMVar nextTime play = do
             then time
             else nextTime'
       mainLoop cont' canvas worldRef controlMVar exitMVar nextTime'' play
+
+-- | Change the playback state.
+changePlay :: RobotControl -> RobotPlay -> RobotParams -> RobotPlay
+changePlay RobotStart play _ = play { robotPlayRunning = True }
+changePlay RobotStop play _ = play { robotPlayRunning = False }
+changePlay RobotForward play params =
+  if robotPlayRunning play
+  then if robotPlayReverse play
+       then
+         let newCyclesPerSecond = robotPlayCyclesPerSecond play / 2.0
+         in if newCyclesPerSecond >=
+               robotParamsMaxCyclesPerSecond params / 32.0
+            then play { robotPlayCyclesPerSecond = newCyclesPerSecond }
+            else play { robotPlayReverse = False,
+                        robotPlayCyclesPerSecond =
+                          robotParamsMaxCyclesPerSecond params / 32.0 }
+       else
+         let newCyclesPerSecond = robotPlayCyclesPerSecond play * 2.0
+         in if newCyclesPerSecond <= robotParamsMaxCyclesPerSecond params
+            then play { robotPlayCyclesPerSecond = newCyclesPerSecond }
+            else play { robotPlayCyclesPerSecond =
+                          robotParamsMaxCyclesPerSecond params }
+  else play { robotPlayDoStep = RobotStepForward }
+changePlay RobotBackward play params =
+  if robotPlayRunning play
+  then if robotPlayReverse play
+       then
+         let newCyclesPerSecond = robotPlayCyclesPerSecond play * 2.0
+         in if newCyclesPerSecond <= robotParamsMaxCyclesPerSecond params
+            then play { robotPlayCyclesPerSecond = newCyclesPerSecond }
+            else play { robotPlayCyclesPerSecond =
+                          robotParamsMaxCyclesPerSecond params }
+       else
+         let newCyclesPerSecond = robotPlayCyclesPerSecond play / 2.0
+         in if newCyclesPerSecond >= robotParamsMaxCyclesPerSecond params / 32.0
+            then play { robotPlayCyclesPerSecond = newCyclesPerSecond }
+            else play { robotPlayReverse = True,
+                        robotPlayCyclesPerSecond =
+                          robotParamsMaxCyclesPerSecond params / 32.0 }
+  else play { robotPlayDoStep = RobotStepBackward }
+changePlay _ _ _ = error "impossible"
 
 -- | Get a new continuity, world, and play control state.
 nextState :: RobotCont -> RobotPlay -> IO (RobotCont, RobotWorld, RobotPlay)

@@ -164,18 +164,19 @@ respawnRobot robot = do
   world <- State.get
   let params = robotWorldParams world
       index = robotWorldNextRobotIndex world
+      roundIndex = robotRoundIndex robot
       program = robotExpr robot
       score = robotScore robot + robotParamsDieScore params
       gen = robotWorldRandom world
-      (robot', gen') = generateRobot index program score gen params
+      (robot', gen') = generateRobot index roundIndex program score gen params
   State.modify $ (\world -> world { robotWorldNextRobotIndex = index + 1,
                                     robotWorldRandom = gen' })
   return robot'
 
 -- | Generate a robot.
-generateRobot :: Int -> RobotExpr -> Double -> Random.StdGen -> RobotParams ->
-                 (Robot, Random.StdGen)
-generateRobot index program score gen params = 
+generateRobot :: Int -> Int -> RobotExpr -> Double -> Random.StdGen ->
+                 RobotParams -> (Robot, Random.StdGen)
+generateRobot index roundIndex program score gen params = 
   let (generalEnergy, gen') =
         Random.randomR (robotParamsMinInitialGeneralEnergy params,
                         robotParamsMaxInitialGeneralEnergy params) gen
@@ -201,17 +202,18 @@ generateRobot index program score gen params =
       locationDeltaY = sin locationDeltaAngle * locationDeltaAbs
       rotation' = normalizeAngle rotation
   in (Robot { robotIndex = index,
-             robotExpr = program,
-             robotData = RobotNull,
-             robotLocation = (locationX', locationY'),
-             robotLocationDelta = (locationDeltaX, locationDeltaY),
-             robotRotation = rotation,
-             robotRotationDelta = rotationDelta,
-             robotGeneralEnergy = generalEnergy,
-             robotWeaponEnergy = weaponEnergy,
-             robotHealth = health,
-             robotScore = score },
-       gen''''''''')
+              robotRoundIndex = roundIndex,
+              robotExpr = program,
+              robotData = RobotNull,
+              robotLocation = (locationX', locationY'),
+              robotLocationDelta = (locationDeltaX, locationDeltaY),
+              robotRotation = rotation,
+              robotRotationDelta = rotationDelta,
+              robotGeneralEnergy = generalEnergy,
+              robotWeaponEnergy = weaponEnergy,
+              robotHealth = health,
+              robotScore = score },
+      gen''''''''')
 
 -- | Update robots for kills.
 updateRobotForKills :: Seq.Seq Int -> RobotParams -> Robot -> Robot

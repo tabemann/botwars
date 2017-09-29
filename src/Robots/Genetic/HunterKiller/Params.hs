@@ -57,6 +57,8 @@ defaultParams =
   RobotParams { robotParamsMaxCyclesPerSecond = 100.0,
                 robotParamsOversizeRadius = 2.0,
                 robotParamsAimRadius = 4.0,
+                robotParamsLabelRadius = 5.0,
+                robotParamsLabelAngle = pi / 4.0,
                 robotParamsLocationFriction = 0.03,
                 robotParamsRotationFriction = 0.005,
                 robotParamsFireFactor = 2.0,
@@ -156,6 +158,12 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
   else if name == "aimRadius"
   then parseLoBoundFloat 0.0 entry $
        \value -> params { robotParamsAimRadius = value }
+  else if name == "labelRadius"
+  then parseLoBoundFloat 0.0 entry $
+       \value -> params { robotParamsLabelRadius = value }
+  else if name == "labelAngle"
+  then parseFloat entry $
+       \value -> params { robotParamsLabelAngle = value }
   else if name == "locationFriction"
   then parseBoundFloat (0.0, 1.0) entry $
        \value -> params { robotParamsLocationFriction = value }

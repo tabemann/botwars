@@ -35,8 +35,10 @@ import Robots.Genetic.HunterKiller.Types
 import Robots.Genetic.HunterKiller.Utility
 import qualified Graphics.Rendering.Cairo as Cairo
 import qualified Data.Sequence as Seq
+import Data.Text as Text
 import Control.Monad (mapM_)
 import Control.Monad.IO.Class (liftIO)
+import Text.Printf (printf)
 
 -- | Draw a world.
 drawWorld :: RobotWorld -> Double -> Double -> Cairo.Render ()
@@ -72,7 +74,27 @@ drawRobot w h params robot = do
   Cairo.moveTo centerX centerY
   Cairo.lineTo endX endY
   Cairo.stroke
-
+  Cairo.setSourceRGB 0.0 0.0 0.0
+  Cairo.selectFontFace ("sans-serif" :: Text.Text) Cairo.FontSlantNormal
+    Cairo.FontWeightNormal
+  Cairo.setFontSize 12.0
+  let label = Text.pack . printf "%d" $ robotRoundIndex robot
+  extents <- Cairo.textExtents label
+  let (labelX, labelY) =
+        subVector
+          (convertCoord (addVector (robotLocation robot)
+                         (mulVector
+                          (robotParamsLabelRadius params * radius)
+                           (cos $ robotParamsLabelAngle params,
+                            sin $ robotParamsLabelAngle params)))
+           w h)
+          ((Cairo.textExtentsWidth extents / 2.0) +
+           Cairo.textExtentsXbearing extents,
+           (Cairo.textExtentsHeight extents / 2.0) +
+           Cairo.textExtentsYbearing extents)
+  Cairo.moveTo labelX labelY
+  Cairo.showText label
+  
 -- | Draw a shot.
 drawShot :: Double -> Double -> RobotParams -> Shot -> Cairo.Render ()
 drawShot w h params shot = do

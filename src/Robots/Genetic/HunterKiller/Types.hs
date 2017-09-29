@@ -109,6 +109,8 @@ data RobotParams =
   RobotParams { robotParamsMaxCyclesPerSecond :: !Double,
                 robotParamsOversizeRadius :: !Double,
                 robotParamsAimRadius :: !Double,
+                robotParamsLabelRadius :: !Double,
+                robotParamsLabelAngle :: !Double,
                 robotParamsLocationFriction :: !Double,
                 robotParamsRotationFriction :: !Double,
                 robotParamsFireFactor :: !Double,
@@ -200,6 +202,7 @@ data RobotState =
 -- | Robot type
 data Robot =
   Robot { robotIndex :: !Int,
+          robotRoundIndex :: !Int,
           robotExpr :: !RobotExpr,
           robotData :: !RobotValue,
           robotLocation :: !(Double, Double),

@@ -125,24 +125,37 @@ collideRobotWithShots robot shots = do
                                  vectorAngle (shotLocationDelta shot)
                            in case deltaAngle of
                                 Just deltaAngle ->
-                                  max 0.0 . cos $ angle - deltaAngle
+                                  max 0.0 . cos . min pi . abs $
+                                    angle - deltaAngle
                                 Nothing -> 0.0
                          Nothing -> 1.0
-                 in (shot, shotEnergy shot * factor *
-                      robotParamsShotHarmFactor params))
-          shotsThatHit
-      shotHarm = max 0.0 (sum $ fmap snd shotsWithHarm)
+                     transferVector =
+                       mulVector
+                         (factor * (robotParamsBaseHitTransferFactor params +
+                                    (shotEnergy shot *
+                                     robotParamsEnergyHitTransferFactor params)))
+                         (shotLocationDelta shot)
+                 in ((shot, shotEnergy shot * factor *
+                      robotParamsShotHarmFactor params), transferVector))
+        shotsThatHit
+      shotHarm = max 0.0 (sum $ fmap (snd . fst) shotsWithHarm)
+      totalTransferVector =
+         foldl' (\accVector transferVector -> addVector accVector transferVector)
+         (0.0, 0.0) (fmap snd shotsWithHarm)
       health = robotHealth robot - shotHarm
   if health > 0.0
     then return $ (robot { robotHealth = health,
                            robotScore = robotScore robot +
                              (shotHarm *
-                              robotParamsDamagedScoreFactor params) },
+                              robotParamsDamagedScoreFactor params),
+                           robotLocationDelta =
+                             addVector (robotLocationDelta robot)
+                             totalTransferVector },
                    shotsThatDidNotHit,
-                   shotsWithHarm, Seq.empty)
+                   fmap fst shotsWithHarm, Seq.empty)
     else do
       robot <- respawnRobot robot
-      return (robot, shotsThatDidNotHit, shotsWithHarm,
+      return (robot, shotsThatDidNotHit, fmap fst shotsWithHarm,
               fmap shotRobotIndex shotsThatHit)
 
 -- | Get whether shot hit robot.
@@ -269,10 +282,18 @@ updateRobot robot stateData action params =
       firePower' = if firePower < robotParamsShotMinFireEnergy params
                    then 0.0
                    else firePower
+      locationDelta'' =
+        if firePower == 0.0
+        then locationDelta'
+        else let recoilEnergy =
+                   -(robotParamsBaseRecoil params +
+                     (firePower * robotParamsEnergyRecoilFactor params))
+             in addVector locationDelta' (cos rotation * recoilEnergy,
+                                          sin rotation * recoilEnergy)
       weaponEnergy' = weaponEnergy - firePower'
       robot' = robot { robotData = stateData,
                        robotLocation = location,
-                       robotLocationDelta = locationDelta',
+                       robotLocationDelta = locationDelta'',
                        robotRotation = rotation,
                        robotRotationDelta = rotationDelta',
                        robotGeneralEnergy = generalEnergy'',

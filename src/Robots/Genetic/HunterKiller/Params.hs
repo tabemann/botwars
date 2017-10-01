@@ -59,6 +59,10 @@ defaultParams =
                 robotParamsAimRadius = 4.0,
                 robotParamsLabelRadius = 5.0,
                 robotParamsLabelAngle = pi / 4.0,
+                robotParamsBaseHitTransferFactor = 0.0025,
+                robotParamsEnergyHitTransferFactor = 0.005,
+                robotParamsBaseRecoil = 0.0025,
+                robotParamsEnergyRecoilFactor = 0.005,
                 robotParamsLocationFriction = 0.03,
                 robotParamsRotationFriction = 0.005,
                 robotParamsFireFactor = 2.0,
@@ -164,6 +168,18 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
   else if name == "labelAngle"
   then parseFloat entry $
        \value -> params { robotParamsLabelAngle = value }
+  else if name == "baseHitTransferFactor"
+  then parseLoBoundFloat 0.0 entry $
+       \value -> params { robotParamsBaseHitTransferFactor = value }
+  else if name == "energyHitTransferFactor"
+  then parseLoBoundFloat 0.0 entry $
+       \value -> params { robotParamsEnergyHitTransferFactor = value }
+  else if name == "baseRecoil"
+  then parseLoBoundFloat 0.0 entry $
+       \value -> params { robotParamsBaseRecoil = value }
+  else if name == "energyRecoilFactor"
+  then parseLoBoundFloat 0.0 entry $
+       \value -> params { robotParamsEnergyRecoilFactor = value }
   else if name == "locationFriction"
   then parseBoundFloat (0.0, 1.0) entry $
        \value -> params { robotParamsLocationFriction = value }

@@ -321,11 +321,11 @@ changePlay RobotForward play params =
        then
          let newCyclesPerSecond = robotPlayCyclesPerSecond play / 2.0
          in if newCyclesPerSecond >=
-               robotParamsMaxCyclesPerSecond params / 32.0
+               robotParamsMaxCyclesPerSecond params / 16.0
             then play { robotPlayCyclesPerSecond = newCyclesPerSecond }
             else play { robotPlayReverse = False,
                         robotPlayCyclesPerSecond =
-                          robotParamsMaxCyclesPerSecond params / 32.0 }
+                          robotParamsMaxCyclesPerSecond params / 16.0 }
        else
          let newCyclesPerSecond = robotPlayCyclesPerSecond play * 2.0
          in if newCyclesPerSecond <= robotParamsMaxCyclesPerSecond params
@@ -344,11 +344,11 @@ changePlay RobotBackward play params =
                           robotParamsMaxCyclesPerSecond params }
        else
          let newCyclesPerSecond = robotPlayCyclesPerSecond play / 2.0
-         in if newCyclesPerSecond >= robotParamsMaxCyclesPerSecond params / 32.0
+         in if newCyclesPerSecond >= robotParamsMaxCyclesPerSecond params / 16.0
             then play { robotPlayCyclesPerSecond = newCyclesPerSecond }
             else play { robotPlayReverse = True,
                         robotPlayCyclesPerSecond =
-                          robotParamsMaxCyclesPerSecond params / 32.0 }
+                          robotParamsMaxCyclesPerSecond params / 16.0 }
   else play { robotPlayDoStep = RobotStepBackward }
 changePlay _ _ _ = error "impossible"
 

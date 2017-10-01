@@ -65,7 +65,7 @@ data RobotControl = RobotExit
                   | RobotStop
                   | RobotForward
                   | RobotBackward
-                  | RobotSave FilePath
+                  | RobotSave !FilePath
                   deriving (Eq)
 
 -- | Robot play control state type

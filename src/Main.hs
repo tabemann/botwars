@@ -27,7 +27,7 @@
 -- ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 -- POSSIBILITY OF SUCH DAMAGE.
 
-{-# LANGUAGE OverloadedStrings, OverloadedLabels, PatternSynonyms #-}
+{-# LANGUAGE OverloadedStrings, OverloadedLabels, PatternSynonyms, BangPatterns #-}
 
 module Main (Main.main) where
 
@@ -45,8 +45,14 @@ import Control.Concurrent (forkIO,
 import Control.Concurrent.MVar (MVar,
                                 newEmptyMVar,
                                 putMVar,
-                                takeMVar,
-                                tryTakeMVar)
+                                takeMVar)
+import Control.Concurrent.STM (STM,
+                               atomically)
+import Control.Concurrent.STM.TQueue (TQueue,
+                                      newTQueueIO,
+                                      writeTQueue,
+                                      readTQueue,
+                                      tryReadTQueue)
 import System.Exit (exitWith,
                     exitFailure,
                     ExitCode(..))
@@ -92,23 +98,25 @@ import GI.Gdk.Objects.Window
 import qualified System.Clock as Clock
 import Prelude hiding (hPutStr,
                        readFile)
+import Control.DeepSeq (NFData(..),
+                        deepseq)
 
 -- | The main action.
 main :: IO ()
 main = do
   inputs <- getInputs
   case inputs of
-    Right (exprs, params) -> setup exprs params
+    Right (exprs, params, savePath) -> setup exprs params savePath
     Left errorText -> do
       hPutStr stderr errorText
       exitFailure
 
 -- | Get inputs.
-getInputs :: IO (Either Text.Text (Seq.Seq RobotExpr, RobotParams))
+getInputs :: IO (Either Text.Text (Seq.Seq RobotExpr, RobotParams, FilePath))
 getInputs = do
   args <- getArgs
   case args of
-    [worldPath, worldCopiesText, paramsPath] -> do
+    [worldPath, worldCopiesText, paramsPath, savePath] -> do
       paramsText <-
         catch (Right <$> readFile paramsPath)
               (\e -> return . Left . Text.pack $ show (e :: IOException))
@@ -131,7 +139,7 @@ getInputs = do
                           then return $ Right
                                (foldl' (><) Seq.empty $
                                  Seq.replicate worldCopies exprs,
-                                 params)
+                                 params, savePath)
                           else return $ Left
                                "number of copies must be greater than zero\n"
                         Nothing -> return $ Left "invalid number of copies\n"
@@ -149,19 +157,20 @@ getInputs = do
           return . Left . Text.pack $ printf "%s: %s\n" paramsPath errorText
     _ -> do progName <- getProgName
             return . Left . Text.pack $
-              printf "Usage: %s WORLD-FILE COUNT PARAMS-FILE\n" progName
+              printf "Usage: %s WORLD-FILE COUNT PARAMS-FILE SAVE-FILE\n"
+              progName
 
 -- | Set up the UI and prepare for running.
-setup :: Seq.Seq RobotExpr -> RobotParams -> IO ()
-setup exprs params = do
-  controlMVar <- newEmptyMVar
-  exitMVar <- newEmptyMVar
+setup :: Seq.Seq RobotExpr -> RobotParams -> FilePath -> IO ()
+setup exprs params savePath = do
+  controlQueue <- newTQueueIO
+  exitQueue <- newTQueueIO
   Gtk.init Nothing
   window <- Gtk.windowNew Gtk.WindowTypeToplevel
   Gtk.setWindowTitle window "Botwars"
   Gtk.onWidgetDestroy window $ do
     Gtk.mainQuit
-    putMVar controlMVar RobotExit
+    atomically $ writeTQueue controlQueue RobotExit
   vbox <- Gtk.boxNew Gtk.OrientationVertical 10
   Gtk.boxSetHomogeneous vbox False
   canvas <- Gtk.drawingAreaNew
@@ -176,7 +185,7 @@ setup exprs params = do
       case world of
         Just world -> drawWorld world w h
         Nothing -> return ()
-      return True
+    return True
   Gtk.boxPackStart vbox canvas True True 0
   buttonBox <- Gtk.buttonBoxNew Gtk.OrientationHorizontal
   Gtk.buttonBoxSetLayout buttonBox Gtk.ButtonBoxStyleCenter
@@ -190,22 +199,29 @@ setup exprs params = do
   Gtk.buttonSetLabel startButton "Start"
   Gtk.buttonSetLabel forwardButton ">>"
   Gtk.buttonSetLabel saveButton "Save"
-  Gtk.onButtonClicked backwardButton $ putMVar controlMVar RobotBackward
-  Gtk.onButtonClicked stopButton $ putMVar controlMVar RobotStop
-  Gtk.onButtonClicked startButton $ putMVar controlMVar RobotStart
-  Gtk.onButtonClicked forwardButton $ putMVar controlMVar RobotForward
+  Gtk.onButtonClicked backwardButton $
+    atomically $ writeTQueue controlQueue RobotBackward
+  Gtk.onButtonClicked stopButton $
+    atomically $ writeTQueue controlQueue RobotStop
+  Gtk.onButtonClicked startButton $
+    atomically $ writeTQueue controlQueue RobotStart
+  Gtk.onButtonClicked forwardButton $
+    atomically $ writeTQueue controlQueue RobotForward
   Gtk.onButtonClicked saveButton $ do
-    fileChooser <- Gtk.fileChooserNativeNew (Just "Save As World")
-      (Just window) Gtk.FileChooserActionSave Nothing
-      Nothing
-    result <- toEnum <$> fromIntegral <$> Gtk.nativeDialogRun fileChooser
-    case result of
-      Gtk.ResponseTypeAccept -> do
-        filename <- Gtk.fileChooserGetFilename fileChooser
-        case filename of
-          Just filename -> putMVar controlMVar (RobotSave filename)
-          Nothing -> return ()
-      _ -> return ()
+    atomically . writeTQueue controlQueue $ RobotSave savePath
+    -- fileChooser <- Gtk.fileChooserNativeNew (Just "Save As World")
+    --   (Just window) Gtk.FileChooserActionSave Nothing
+    --   Nothing
+    -- result <- toEnum <$> fromIntegral <$> Gtk.nativeDialogRun fileChooser
+    -- case result of
+    --   Gtk.ResponseTypeAccept -> do
+    --     filename <- Gtk.fileChooserGetFilename fileChooser
+    --     case filename of
+    --       Just filename -> do
+    --         let !message = deepseq filename `seq` RobotSave filename
+    --         atomically $ writeTQueue controlQueue message
+    --       Nothing -> return ()
+    --   _ -> return ()
   Gtk.boxPackStart buttonBox backwardButton False False 0
   Gtk.boxPackStart buttonBox stopButton False False 0
   Gtk.boxPackStart buttonBox startButton False False 0
@@ -225,20 +241,20 @@ setup exprs params = do
                       robotPlayReverse = False,
                       robotPlayIndex = 0,
                       robotPlayDoStep = RobotNoStep }
-    mainLoop (initCont exprs params gen) canvas worldRef controlMVar
-      exitMVar time play
-  exitStatus <- takeMVar exitMVar
+    mainLoop (initCont exprs params gen) canvas worldRef controlQueue
+      exitQueue time play
+  exitStatus <- atomically $ readTQueue exitQueue
   exitWith exitStatus
 
 -- | Execute the main loop of the genetically-programmed robot fighting arena.
 mainLoop :: RobotCont -> Gtk.DrawingArea -> IORef (Maybe RobotWorld) ->
-            MVar RobotControl -> MVar ExitCode -> Clock.TimeSpec ->
+            TQueue RobotControl -> TQueue ExitCode -> Clock.TimeSpec ->
             RobotPlay -> IO ()
-mainLoop cont canvas worldRef controlMVar exitMVar nextTime play = do
+mainLoop cont canvas worldRef controlQueue exitQueue nextTime play = do
   let params = robotContParams cont
-  control <- tryTakeMVar controlMVar
+  control <- atomically $ tryReadTQueue controlQueue
   case control of
-    Just RobotExit -> putMVar exitMVar ExitSuccess
+    Just RobotExit -> atomically $ writeTQueue exitQueue ExitSuccess
     Just (RobotSave path) -> do
       case robotContWorld cont of
         Just world -> do
@@ -247,19 +263,19 @@ mainLoop cont canvas worldRef controlMVar exitMVar nextTime play = do
             Left errorText -> hPutStr stderr errorText
             Right () -> return ()
         Nothing -> return ()
-      mainLoop cont canvas worldRef controlMVar exitMVar nextTime play
+      mainLoop cont canvas worldRef controlQueue exitQueue nextTime play
     Just control ->
       let play' = changePlay control play params
-      in mainLoop cont canvas worldRef controlMVar exitMVar nextTime play'
+      in mainLoop cont canvas worldRef controlQueue exitQueue nextTime play'
     Nothing -> do
       let displayInfo =
             robotPlayRunning play || (robotPlayDoStep play /= RobotNoStep)
       (cont', world, play) <- nextState cont play
-      writeIORef worldRef (Just world)
+      writeIORef worldRef (world `seq` Just world)
       Gdk.threadsAddIdle PRIORITY_HIGH $ do
-        window <- #getWindow canvas
+        window <- Gtk.widgetGetWindow canvas
         case window of
-          Just window -> #invalidateRect window Nothing True
+          Just window -> Gdk.windowInvalidateRect window Nothing True
           Nothing -> return ()
         return False
       if displayInfo
@@ -293,7 +309,7 @@ mainLoop cont canvas worldRef controlMVar exitMVar nextTime play = do
                                   2000000000.0 / cyclesPerSecond)
             then time
             else nextTime'
-      mainLoop cont' canvas worldRef controlMVar exitMVar nextTime'' play
+      mainLoop cont' canvas worldRef controlQueue exitQueue nextTime'' play
 
 -- | Change the playback state.
 changePlay :: RobotControl -> RobotPlay -> RobotParams -> RobotPlay

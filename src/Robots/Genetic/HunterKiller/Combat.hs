@@ -231,6 +231,7 @@ setupWorld = do
   return $ RobotWorld { robotWorldParams = params,
                         robotWorldRobots = robots,
                         robotWorldShots = Seq.empty,
+                        robotWorldHits = Seq.empty,
                         robotWorldCycles = 0,
                         robotWorldKills = 0,
                         robotWorldNextRobotIndex = nextIndex,

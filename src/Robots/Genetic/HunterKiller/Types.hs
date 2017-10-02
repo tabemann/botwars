@@ -42,6 +42,7 @@ module Robots.Genetic.HunterKiller.Types
    RobotState (..),
    Robot (..),
    Shot (..),
+   Hit (..),
    RobotValue (..),
    RobotIntrinsicFunc,
    RobotExpr (..),
@@ -94,6 +95,7 @@ data RobotWorld =
   RobotWorld { robotWorldParams :: !RobotParams,
                robotWorldRobots :: !(Seq.Seq Robot),
                robotWorldShots :: !(Seq.Seq Shot),
+               robotWorldHits :: !(Seq.Seq Hit),
                robotWorldCycles :: !Int,
                robotWorldKills :: !Int,
                robotWorldNextRobotIndex :: !Int,
@@ -115,6 +117,9 @@ data RobotParams =
                 robotParamsEnergyHitTransferFactor :: !Double,
                 robotParamsBaseRecoil :: !Double,
                 robotParamsEnergyRecoilFactor :: !Double,
+                robotParamsHitVelocityFactor :: !Double,
+                robotParamsHitFullRadius :: !Double,
+                robotParamsHitDisplayCycles :: !Int,
                 robotParamsLocationFriction :: !Double,
                 robotParamsRotationFriction :: !Double,
                 robotParamsFireFactor :: !Double,
@@ -224,6 +229,13 @@ data Shot =
          shotLocationDelta :: !(Double, Double),
          shotEnergy :: !Double,
          shotRobotIndex :: !Int }
+
+-- | Hit type
+data Hit =
+  Hit { hitLocation :: !(Double, Double),
+        hitLocationDelta :: !(Double, Double),
+        hitEnergy :: !Double,
+        hitTimer :: !Int }
 
 -- | Robot value type
 data RobotValue = RobotNull

@@ -45,6 +45,7 @@ drawWorld :: RobotWorld -> Double -> Double -> Cairo.Render ()
 drawWorld world w h = do
   mapM_ (drawRobot w h (robotWorldParams world)) (robotWorldRobots world)
   mapM_ (drawShot w h (robotWorldParams world)) (robotWorldShots world)
+  mapM_ (drawHit w h (robotWorldParams world)) (robotWorldHits world)
 
 -- | Draw a robot.
 drawRobot :: Double -> Double -> RobotParams -> Robot -> Cairo.Render ()
@@ -108,6 +109,22 @@ drawShot w h params shot = do
   Cairo.lineTo endX endY
   Cairo.stroke
 
+-- | Draw a hit.
+drawHit :: Double -> Double -> RobotParams -> Hit -> Cairo.Render ()
+drawHit w h params hit = do
+  Cairo.setLineWidth 1.0
+  let (centerX, centerY) = convertCoord (hitLocation hit) w h
+  let radius = robotParamsHitFullRadius params * hitEnergy hit
+  Cairo.arc centerX centerY (radius * w)
+    0.0 (2.0 * pi)
+  Cairo.setSourceRGBA 1.0 0.0 0.0
+    (1.0 - (fromIntegral (hitTimer hit) /
+            fromIntegral (robotParamsHitDisplayCycles params)))
+  Cairo.fill
+  Cairo.arc centerX centerY (radius * w) 0.0 (2.0 * pi)
+  Cairo.setSourceRGBA 1.0 0.0 0.0 1.0
+  Cairo.stroke
+  
 -- | Convert a coordinate.
 convertCoord :: (Double, Double) -> Double -> Double -> (Double, Double)
 convertCoord (x, y) w h = ((x * w) + (w / 2.0), (h / 2.0) - (y * h))

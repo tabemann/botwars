@@ -63,6 +63,9 @@ defaultParams =
                 robotParamsEnergyHitTransferFactor = 0.005,
                 robotParamsBaseRecoil = 0.0025,
                 robotParamsEnergyRecoilFactor = 0.005,
+                robotParamsHitVelocityFactor = 0.01,
+                robotParamsHitFullRadius = 0.015,
+                robotParamsHitDisplayCycles = 10,
                 robotParamsLocationFriction = 0.03,
                 robotParamsRotationFriction = 0.005,
                 robotParamsFireFactor = 2.0,
@@ -180,6 +183,15 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
   else if name == "energyRecoilFactor"
   then parseLoBoundFloat 0.0 entry $
        \value -> params { robotParamsEnergyRecoilFactor = value }
+  else if name == "hitVelocityFactor"
+  then parseLoBoundFloat 0.0 entry $
+       \value -> params { robotParamsHitVelocityFactor = value }
+  else if name == "hitFullRadius"
+  then parseLoBoundFloat 0.0 entry $
+       \value -> params { robotParamsHitFullRadius = value }
+  else if name == "hitDisplayCycles"
+  then parseLoBoundInt 0 entry $
+       \value -> params { robotParamsHitDisplayCycles = value }
   else if name == "locationFriction"
   then parseBoundFloat (0.0, 1.0) entry $
        \value -> params { robotParamsLocationFriction = value }

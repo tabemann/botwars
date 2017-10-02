@@ -71,6 +71,7 @@ worldCycle = do
       updatedShots = collectJust $ fmap (\shot -> updateShot shot params)
                      (robotWorldShots world)
   collideRobotsAndShots robots (updatedShots >< newShots)
+  updateHits
   State.modify $ \world ->
                    world { robotWorldCycles = robotWorldCycles world + 1 }
   world <- State.get
@@ -79,30 +80,46 @@ worldCycle = do
     then return RobotEndRound
     else return RobotNextCycle
 
+-- | Update hits.
+updateHits :: State.State RobotWorld ()
+updateHits = do
+  params <- robotWorldParams <$> State.get
+  State.modify $ \world ->
+    world { robotWorldHits =
+              Seq.filter (\hit -> hitTimer hit <=
+                                  robotParamsHitDisplayCycles params)
+                (fmap (\hit ->
+                         hit { hitTimer = hitTimer hit + 1,
+                               hitLocation = addVector (hitLocation hit)
+                                             (hitLocationDelta hit) })
+                  (robotWorldHits world)) }
+
 -- | Collide robots and shots.
 collideRobotsAndShots :: Seq.Seq Robot -> Seq.Seq Shot ->
                          State.State RobotWorld ()
 collideRobotsAndShots robots shots = do
   params <- robotWorldParams <$> State.get
-  (robots, shots, shotsWithHarm, kills) <-
-    foldM (\(robots, shots, shotsWithHarm, kills) robot -> do
-              (robot, shots, shotsWithHarm',  robotKills) <-
+  (robots, shots, shotsWithHarm, kills, hits) <-
+    foldM (\(robots, shots, shotsWithHarm, kills, hits) robot -> do
+              (robot, shots, shotsWithHarm', robotKills, robotHits) <-
                 collideRobotWithShots robot shots
               return $ (robots |> robot, shots, shotsWithHarm >< shotsWithHarm',
-                        kills >< robotKills))
-    (Seq.empty, shots, Seq.empty, Seq.empty) robots
+                        kills >< robotKills, hits >< robotHits))
+    (Seq.empty, shots, Seq.empty, Seq.empty, Seq.empty) robots
   let robots' = fmap (updateRobotForKills kills params) robots
       robots'' = fmap (updateRobotForHits shotsWithHarm params) robots'
   State.modify (\world -> world { robotWorldRobots = robots'',
                                   robotWorldShots = shots,
                                   robotWorldKills = robotWorldKills world +
-                                                    Seq.length kills })
+                                                    Seq.length kills,
+                                  robotWorldHits = robotWorldHits world ><
+                                                   hits })
 
 -- | Collide robots with shots.
 collideRobotWithShots :: Robot -> Seq.Seq Shot ->
                          State.State RobotWorld
                            (Robot, Seq.Seq Shot, Seq.Seq (Shot, Double),
-                            Seq.Seq Int)
+                            Seq.Seq Int, Seq.Seq Hit)
 collideRobotWithShots robot shots = do
   params <- robotWorldParams <$> State.get
   let (shotsThatHit, shotsThatDidNotHit) =
@@ -143,6 +160,13 @@ collideRobotWithShots robot shots = do
          foldl' (\accVector transferVector -> addVector accVector transferVector)
          (0.0, 0.0) (fmap snd shotsWithHarm)
       health = robotHealth robot - shotHarm
+      hits = fmap (\shot -> Hit { hitLocation = shotLocation shot,
+                                  hitLocationDelta =
+                                    mulVector
+                                      (robotParamsHitVelocityFactor params)
+                                      (shotLocationDelta shot),
+                                  hitEnergy = shotEnergy shot,
+                                  hitTimer = 0 }) shotsThatHit
   if health > 0.0
     then return $ (robot { robotHealth = health,
                            robotScore = robotScore robot +
@@ -152,11 +176,12 @@ collideRobotWithShots robot shots = do
                              addVector (robotLocationDelta robot)
                              totalTransferVector },
                    shotsThatDidNotHit,
-                   fmap fst shotsWithHarm, Seq.empty)
+                   fmap fst shotsWithHarm, Seq.empty,
+                   hits)
     else do
       robot <- respawnRobot robot
       return (robot, shotsThatDidNotHit, fmap fst shotsWithHarm,
-              fmap shotRobotIndex shotsThatHit)
+              fmap shotRobotIndex shotsThatHit, hits)
 
 -- | Get whether shot hit robot.
 didShotHitRobot :: Robot -> Shot -> Double -> Bool

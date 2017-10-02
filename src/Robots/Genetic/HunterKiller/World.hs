@@ -66,7 +66,7 @@ worldCycle = do
         fmap (\(robot, (stateData, action)) ->
                 updateRobot robot stateData action params)
         cycleEndStates
-      robots = fmap fst updatedRobotsAndShots
+      robots = collideRobots (fmap fst updatedRobotsAndShots) params
       newShots = collectJust . fmap snd $ updatedRobotsAndShots
       updatedShots = collectJust $ fmap (\shot -> updateShot shot params)
                      (robotWorldShots world)
@@ -79,6 +79,33 @@ worldCycle = do
      (robotWorldKills world >= robotParamsMaxKills params)
     then return RobotEndRound
     else return RobotNextCycle
+
+-- | Collide robots.
+collideRobots :: Seq.Seq Robot -> RobotParams -> Seq.Seq Robot
+collideRobots robots params =
+  foldl' (\robots robot -> fmap (collideRobot robot params) robots) robots robots
+  where collideRobot robot0 params robot1 =
+          if robotIndex robot0 /= robotIndex robot1
+          then let distance =
+                     absVector $ subVector (robotLocation robot0)
+                     (robotLocation robot1)
+               in if distance > (robotParamsRobotRadius params) * 2
+                  then robot1
+                  else let angle = vectorAngle $ subVector (robotLocation robot1)
+                                   (robotLocation robot0)
+                           deltaAngle = vectorAngle $ robotLocationDelta robot1
+                           speed = absVector $ robotLocationDelta robot1
+                           newAngle =
+                             case (angle, deltaAngle) of
+                               (Just angle, Just deltaAngle) ->
+                                 -angle - deltaAngle
+                               (Nothing, Just deltaAngle) -> -deltaAngle
+                               (Just angle, Nothing) -> -angle
+                               (Nothing, Nothing) -> 0.0
+                       in robot1 { robotLocationDelta =
+                                     mulVector speed
+                                       (cos newAngle, sin newAngle) }
+          else robot1
 
 -- | Update hits.
 updateHits :: State.State RobotWorld ()
@@ -160,13 +187,32 @@ collideRobotWithShots robot shots = do
          foldl' (\accVector transferVector -> addVector accVector transferVector)
          (0.0, 0.0) (fmap snd shotsWithHarm)
       health = robotHealth robot - shotHarm
-      hits = fmap (\shot -> Hit { hitLocation = shotLocation shot,
-                                  hitLocationDelta =
-                                    mulVector
-                                      (robotParamsHitVelocityFactor params)
-                                      (shotLocationDelta shot),
+      hits = fmap (\shot ->
+                     let relativeLocation =
+                           subVector (robotLocation robot) (shotLocation shot)
+                         shotAngle = vectorAngle $ shotLocationDelta shot
+                         shotRobotAngle = vectorAngle relativeLocation
+                         locationDelta =
+                           mulVector (robotParamsHitVelocityFactor params)
+                             (shotLocationDelta shot)
+                     in case (shotAngle, shotRobotAngle) of
+                       (Just shotAngle, Just shotRobotAngle) ->
+                         let projection =
+                               cos (shotAngle - shotRobotAngle) *
+                               absVector relativeLocation
+                             location =
+                               addVector (shotLocation shot)
+                                 (mulVector projection
+                                   (shotLocationDelta shot))
+                         in Hit { hitLocation = location,
+                                  hitLocationDelta = locationDelta,
                                   hitEnergy = shotEnergy shot,
-                                  hitTimer = 0 }) shotsThatHit
+                                  hitTimer = 0 }
+                       _ ->
+                         Hit { hitLocation = shotLocation shot,
+                               hitLocationDelta = locationDelta,
+                               hitEnergy = shotEnergy shot,
+                               hitTimer = 0 }) shotsThatHit
   if health > 0.0
     then return $ (robot { robotHealth = health,
                            robotScore = robotScore robot +
@@ -186,15 +232,20 @@ collideRobotWithShots robot shots = do
 -- | Get whether shot hit robot.
 didShotHitRobot :: Robot -> Shot -> Double -> Bool
 didShotHitRobot robot shot radius =
-  let relativeLocation0 =
+  let relativeLocation =
         subVector (robotLocation robot) (shotLocation shot)
-      relativeLocation1 =
-        subVector (robotLocation robot)
-          (addVector (shotLocation shot) (shotLocationDelta shot))
-      distance0 = absVector relativeLocation0
-      distance1 = absVector relativeLocation1
-      distance = absVector (shotLocationDelta shot)
-  in ((distance0 + distance1) - distance) < (radius * 2)
+      shotAngle = vectorAngle $ shotLocationDelta shot
+      shotRobotAngle = vectorAngle relativeLocation
+  in case (shotAngle, shotRobotAngle) of
+       (Just shotAngle, Just shotRobotAngle) ->
+         let projection0 = cos (((pi / 2.0) + shotAngle) - shotRobotAngle) *
+                           absVector relativeLocation
+             projection1 = cos (shotAngle - shotRobotAngle) *
+                           absVector relativeLocation
+         in abs projection0 <= abs radius && projection1 >= 0.0 &&
+            projection1 <= (absVector $ shotLocationDelta shot)
+       (_, Nothing) -> True
+       (Nothing, _) -> False
 
 -- | Respawn a robot
 respawnRobot :: Robot -> State.State RobotWorld Robot

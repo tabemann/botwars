@@ -61,9 +61,10 @@ defaultParams =
                 robotParamsLabelAngle = pi / 4.0,
                 robotParamsBaseHitTransferFactor = 0.0025,
                 robotParamsEnergyHitTransferFactor = 0.005,
-                robotParamsBaseRecoil = 0.0025,
-                robotParamsEnergyRecoilFactor = 0.005,
+                robotParamsBaseRecoil = 0.0075,
+                robotParamsEnergyRecoilFactor = 0.02,
                 robotParamsHitVelocityFactor = 0.01,
+                robotParamsHitBaseRadius = 0.005,
                 robotParamsHitFullRadius = 0.015,
                 robotParamsHitDisplayCycles = 10,
                 robotParamsLocationFriction = 0.03,
@@ -75,11 +76,11 @@ defaultParams =
                 robotParamsShotEnergyDecay = 0.35,
                 robotParamsShotMinFireEnergy = 0.25,
                 robotParamsShotMinEnergy = 0.1,
-                robotParamsRobotRadius = 0.00375,
+                robotParamsRobotRadius = 0.005,
                 robotParamsMaxCycles = 7500,
                 robotParamsMaxKills = 200,
                 robotParamsMaxDepth = 1000,
-                robotParamsMinKills = 50,
+                robotParamsMinKills = 20,
                 robotParamsMaxCodeDepth = 25,
                 robotParamsSavedWorldCount = 10,
                 robotParamsMaxRewind = 10000,
@@ -89,9 +90,9 @@ defaultParams =
                 robotParamsViewSortAngleFactor = 0.4,
                 robotParamsViewSortDistanceFactor = 0.6,
                 robotParamsGeneralEnergyGain = 0.1,
-                robotParamsWeaponEnergyGain = 0.005,
-                robotParamsHealthGain = 0.001,
-                robotParamsShotHarmFactor = 0.75,
+                robotParamsWeaponEnergyGain = 0.01,
+                robotParamsHealthGain = 0.002,
+                robotParamsShotHarmFactor = 1.0,
                 robotParamsMinInitialGeneralEnergy = 0.5,
                 robotParamsMaxInitialGeneralEnergy = 1.0,
                 robotParamsMinInitialWeaponEnergy = 0.0,
@@ -186,6 +187,9 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
   else if name == "hitVelocityFactor"
   then parseLoBoundFloat 0.0 entry $
        \value -> params { robotParamsHitVelocityFactor = value }
+  else if name == "hitBaseRadius"
+  then parseLoBoundFloat 0.0 entry $
+       \value -> params { robotParamsHitBaseRadius = value }
   else if name == "hitFullRadius"
   then parseLoBoundFloat 0.0 entry $
        \value -> params { robotParamsHitFullRadius = value }

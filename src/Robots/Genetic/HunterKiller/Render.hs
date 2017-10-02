@@ -114,7 +114,9 @@ drawHit :: Double -> Double -> RobotParams -> Hit -> Cairo.Render ()
 drawHit w h params hit = do
   Cairo.setLineWidth 1.0
   let (centerX, centerY) = convertCoord (hitLocation hit) w h
-  let radius = robotParamsHitFullRadius params * hitEnergy hit
+  let radius =
+        ((robotParamsHitFullRadius params - robotParamsHitBaseRadius params) *
+         hitEnergy hit) + robotParamsHitBaseRadius params
   Cairo.arc centerX centerY (radius * w)
     0.0 (2.0 * pi)
   Cairo.setSourceRGBA 1.0 0.0 0.0

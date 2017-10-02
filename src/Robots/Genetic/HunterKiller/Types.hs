@@ -118,6 +118,7 @@ data RobotParams =
                 robotParamsBaseRecoil :: !Double,
                 robotParamsEnergyRecoilFactor :: !Double,
                 robotParamsHitVelocityFactor :: !Double,
+                robotParamsHitBaseRadius :: !Double,
                 robotParamsHitFullRadius :: !Double,
                 robotParamsHitDisplayCycles :: !Int,
                 robotParamsLocationFriction :: !Double,

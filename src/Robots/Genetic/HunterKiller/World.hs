@@ -202,7 +202,8 @@ collideRobotWithShots robot shots = do
                                absVector relativeLocation
                              location =
                                addVector (shotLocation shot)
-                                 (mulVector projection
+                                 (mulVector (projection /
+                                             absVector (shotLocationDelta shot))
                                    (shotLocationDelta shot))
                          in Hit { hitLocation = location,
                                   hitLocationDelta = locationDelta,

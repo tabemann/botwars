@@ -431,7 +431,9 @@ robotCycle robot = do
           Nothing -> 0.0
       robotObjects = fmap (\robot -> (robotLocation robot,
                                       robotLocationDelta robot))
-                       (robotWorldRobots world)
+                       (Seq.filter (\robot' -> robotIndex robot' /=
+                                           robotIndex robot)
+                         (robotWorldRobots world))
       shotObjects = fmap (\shot -> (shotLocation shot,
                                     shotLocationDelta shot))
                       (robotWorldShots world)

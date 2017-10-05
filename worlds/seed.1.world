@@ -23,13 +23,13 @@ world
 		for (special gt))
 	      then
 	       (if (apply with {load 10, special 0} for (special gt))
-		then (const float 0.001)
-		else (const float -0.001))
+		then (const float 0.01)
+		else (const float -0.01))
 	      else (special 0)))
 	  else (special 0))
        }
       for (special turn),
-      const float 0.01
+      const float 0.1
      }
     for (special thrust),
     if

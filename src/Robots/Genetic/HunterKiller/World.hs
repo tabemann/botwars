@@ -1,4 +1,4 @@
--- Copyright (c) 2017, Travis Bemann
+-- Copyright (c) 2017-2018, Travis Bemann
 -- All rights reserved.
 -- 
 -- Redistribution and use in source and binary forms, with or without
@@ -302,6 +302,8 @@ generateRobot index roundIndex program score gen params =
               robotGeneralEnergy = generalEnergy,
               robotWeaponEnergy = weaponEnergy,
               robotHealth = health,
+              robotNoThrustCycles = 0,
+              robotNoTurnCycles = 0,
               robotScore = score },
       gen''''''''')
 
@@ -367,7 +369,28 @@ updateRobot robot stateData action params =
                      (firePower * robotParamsEnergyRecoilFactor params))
              in addVector locationDelta' (cos rotation * recoilEnergy,
                                           sin rotation * recoilEnergy)
+      applyNoThrustPenalty =
+        thrustPower == 0.0 &&
+        robotNoThrustCycles robot == robotParamsNoThrustPenaltyCycles params
+      applyNoTurnPenalty =
+        turnPower == 0.0 &&
+        robotNoTurnCycles robot == robotParamsNoTurnPenaltyCycles params
+      noThrustCycles = if thrustPower /= 0.0 || applyNoThrustPenalty
+                       then 0
+                       else robotNoThrustCycles robot + 1
+      noTurnCycles = if turnPower /= 0.0 || applyNoTurnPenalty
+                     then 0
+                     else robotNoTurnCycles robot + 1
       weaponEnergy' = weaponEnergy - firePower'
+      score = robotScore robot +
+              (thrustPower * robotParamsThrustScoreFactor params) +
+              (turnPower * robotParamsTurnScoreFactor params) +
+              (if applyNoThrustPenalty
+               then robotParamsNoThrustPenaltyScoreFactor params
+               else 0.0) +
+              (if applyNoTurnPenalty
+               then robotParamsNoTurnPenaltyScoreFactor params
+               else 0.0)
       robot' = robot { robotData = stateData,
                        robotLocation = location,
                        robotLocationDelta = locationDelta'',
@@ -376,11 +399,9 @@ updateRobot robot stateData action params =
                        robotGeneralEnergy = generalEnergy'',
                        robotWeaponEnergy = weaponEnergy',
                        robotHealth = health,
-                       robotScore = robotScore robot +
-                                    (thrustPower *
-                                     robotParamsThrustScoreFactor params) +
-                                    (turnPower *
-                                     robotParamsTurnScoreFactor params) }
+                       robotNoThrustCycles = noThrustCycles,
+                       robotNoTurnCycles = noTurnCycles,
+                       robotScore = score }
       shot = if firePower' > 0.0
              then Just $ fireShot robot' firePower' params
              else Nothing

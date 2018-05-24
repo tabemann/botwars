@@ -1,4 +1,4 @@
--- Copyright (c) 2017, Travis Bemann
+-- Copyright (c) 2017-2018, Travis Bemann
 -- All rights reserved.
 -- 
 -- Redistribution and use in source and binary forms, with or without
@@ -157,12 +157,16 @@ data RobotParams =
                 robotParamsMaxInitialLocationDeltaAbs :: !Double,
                 robotParamsMinInitialRotationDeltaAbs :: !Double,
                 robotParamsMaxInitialRotationDeltaAbs :: !Double,
+                robotParamsNoThrustPenaltyCycles :: !Int,
+                robotParamsNoTurnPenaltyCycles :: !Int,
                 robotParamsKillScore :: !Double,
                 robotParamsHitScoreFactor :: !Double,
                 robotParamsDieScore :: !Double,
                 robotParamsDamagedScoreFactor :: !Double,
                 robotParamsThrustScoreFactor :: !Double,
                 robotParamsTurnScoreFactor :: !Double,
+                robotParamsNoThrustPenaltyScoreFactor :: !Double,
+                robotParamsNoTurnPenaltyScoreFactor :: !Double,
                 robotParamsMutationChance :: !Double,
                 robotParamsMutationReplaceLeafChance :: !Double,
                 robotParamsMutationReplaceNodeChance :: !Double,
@@ -222,6 +226,8 @@ data Robot =
           robotGeneralEnergy :: !Double,
           robotWeaponEnergy :: !Double,
           robotHealth :: !Double,
+          robotNoThrustCycles :: !Int,
+          robotNoTurnCycles :: !Int,
           robotScore :: !Double }
 
 -- | Shot type

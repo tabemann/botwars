@@ -1,4 +1,4 @@
--- Copyright (c) 2017, Travis Bemann
+-- Copyright (c) 2017-2018, Travis Bemann
 -- All rights reserved.
 -- 
 -- Redistribution and use in source and binary forms, with or without
@@ -103,12 +103,16 @@ defaultParams =
                 robotParamsMaxInitialLocationDeltaAbs = 0.005,
                 robotParamsMinInitialRotationDeltaAbs = 0.0,
                 robotParamsMaxInitialRotationDeltaAbs = pi / 50.0,
+                robotParamsNoThrustPenaltyCycles = 100,
+                robotParamsNoTurnPenaltyCycles = 100,
                 robotParamsKillScore = 10.0,
                 robotParamsHitScoreFactor = 1.0,
                 robotParamsDieScore = -1.0,
                 robotParamsDamagedScoreFactor = -0.25,
                 robotParamsThrustScoreFactor = 0.075,
                 robotParamsTurnScoreFactor = 0.075,
+                robotParamsNoThrustPenaltyScoreFactor = -0.125,
+                robotParamsNoTurnPenaltyScoreFactor = -0.125,
                 robotParamsMutationChance = 0.05,
                 robotParamsMutationReplaceLeafChance = 0.25,
                 robotParamsMutationReplaceNodeChance = 0.1,
@@ -304,6 +308,12 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
   else if name == "maxInitialRotationDeltaAbs"
   then parseLoBoundFloat 0.0 entry $
        \value -> params { robotParamsMaxInitialRotationDeltaAbs = value }
+  else if name == "noThrustPenaltyCycles"
+  then parseLoBoundInt 0 entry $
+       \value -> params { robotParamsNoThrustPenaltyCycles = value }
+  else if name == "noTurnPenaltyCycles"
+  then parseLoBoundInt 0 entry $
+       \value -> params { robotParamsNoTurnPenaltyCycles = value }
   else if name == "killScore"
   then parseFloat entry $
        \value -> params { robotParamsKillScore = value }
@@ -322,6 +332,12 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
   else if name == "turnScoreFactor"
   then parseFloat entry $
        \value -> params { robotParamsTurnScoreFactor = value }
+  else if name == "noThrustPenaltyScoreFactor"
+  then parseFloat entry $
+       \value -> params { robotParamsNoThrustPenaltyScoreFactor = value }
+  else if name == "noTurnPenaltyScoreFactor"
+  then parseFloat entry $
+       \value -> params { robotParamsNoTurnPenaltyScoreFactor = value }
   else if name == "mutationChance"
   then parseBoundFloat (0.0, 1.0) entry $
        \value -> params { robotParamsMutationChance = value }

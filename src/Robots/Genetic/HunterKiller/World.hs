@@ -304,6 +304,8 @@ generateRobot index roundIndex program score gen params =
               robotHealth = health,
               robotNoThrustCycles = 0,
               robotNoTurnCycles = 0,
+              robotThrustAcc = 0.0,
+              robotTurnAcc = 0.0,
               robotScore = score },
       gen''''''''')
 
@@ -369,27 +371,36 @@ updateRobot robot stateData action params =
                      (firePower * robotParamsEnergyRecoilFactor params))
              in addVector locationDelta' (cos rotation * recoilEnergy,
                                           sin rotation * recoilEnergy)
+      thrustAcc = robotThrustAcc robot + thrustPower
+      turnAcc = robotTurnAcc robot + turnPower
       applyNoThrustPenalty =
-        thrustPower == 0.0 &&
+        thrustAcc < robotParamsNoThrustPenaltyMinimum params &&
         robotNoThrustCycles robot == robotParamsNoThrustPenaltyCycles params
       applyNoTurnPenalty =
-        turnPower == 0.0 &&
+        turnAcc < robotParamsNoTurnPenaltyMinimum params &&
         robotNoTurnCycles robot == robotParamsNoTurnPenaltyCycles params
-      noThrustCycles = if thrustPower /= 0.0 || applyNoThrustPenalty
+      noThrustCycles = if thrustAcc >= robotParamsNoThrustPenaltyMinimum params
+                          || applyNoThrustPenalty
                        then 0
                        else robotNoThrustCycles robot + 1
-      noTurnCycles = if turnPower /= 0.0 || applyNoTurnPenalty
+      noTurnCycles = if turnAcc >= robotParamsNoTurnPenaltyMinimum params
+                        || applyNoTurnPenalty
                      then 0
                      else robotNoTurnCycles robot + 1
+      thrustAcc' = max 0.0 . min (robotParamsNoThrustPenaltyMaximum params) $
+                   evalPolynomial (robotParamsNoThrustPenaltyDecay params)
+                   thrustAcc
+      turnAcc' = max 0.0 . min (robotParamsNoTurnPenaltyMaximum params) $
+                 evalPolynomial (robotParamsNoTurnPenaltyDecay params) turnAcc
       weaponEnergy' = weaponEnergy - firePower'
       score = robotScore robot +
               (thrustPower * robotParamsThrustScoreFactor params) +
               (turnPower * robotParamsTurnScoreFactor params) +
               (if applyNoThrustPenalty
-               then robotParamsNoThrustPenaltyScoreFactor params
+               then robotParamsNoThrustPenaltyScore params
                else 0.0) +
               (if applyNoTurnPenalty
-               then robotParamsNoTurnPenaltyScoreFactor params
+               then robotParamsNoTurnPenaltyScore params
                else 0.0)
       robot' = robot { robotData = stateData,
                        robotLocation = location,
@@ -401,6 +412,8 @@ updateRobot robot stateData action params =
                        robotHealth = health,
                        robotNoThrustCycles = noThrustCycles,
                        robotNoTurnCycles = noTurnCycles,
+                       robotThrustAcc = thrustAcc',
+                       robotTurnAcc = turnAcc',
                        robotScore = score }
       shot = if firePower' > 0.0
              then Just $ fireShot robot' firePower' params

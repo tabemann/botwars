@@ -1,4 +1,4 @@
--- Copyright (c) 2017, Travis Bemann
+-- Copyright (c) 2017-2018, Travis Bemann
 -- All rights reserved.
 -- 
 -- Redistribution and use in source and binary forms, with or without
@@ -43,13 +43,16 @@ module Robots.Genetic.HunterKiller.Utility
    absVector,
    vectorAngle,
    normalizeAngle,
-   modDouble)
+   modDouble,
+   mkPolynomial,
+   evalPolynomial)
   
 where
 
 import Robots.Genetic.HunterKiller.Types
 import qualified Data.Sequence as Seq
 import Data.Sequence ((|>))
+import Data.Sequence (ViewL(..))
 import qualified Data.Text as Text
 import Data.Functor (fmap)
 import Data.Foldable (Foldable,
@@ -156,3 +159,16 @@ normalizeAngleCore angle =
 -- | Floating point modulus
 modDouble :: Double -> Double -> Double
 modDouble x y = x - ((fromIntegral (floor (x / y))) * y)
+
+-- | Create a polynomial from a list
+mkPolynomial :: [Double] -> Polynomial
+mkPolynomial = Polynomial . Seq.fromList
+
+-- | Evaluate a polynomial
+evalPolynomial :: Polynomial -> Double -> Double
+evalPolynomial (Polynomial polynomial) x = evalPolynomial' polynomial 0.0 0.0
+  where evalPolynomial' polynomial power acc =
+          case Seq.viewl polynomial of
+            coeff :< rest ->
+              evalPolynomial' rest (power + 1.0) (acc + (coeff * (x ** power)))
+            EmptyL -> acc

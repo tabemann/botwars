@@ -51,7 +51,8 @@ module Robots.Genetic.HunterKiller.Types
    RobotEvent (..),
    RobotCycleState (..),
    RobotConfigEntry (..),
-   RobotConfigValue (..))
+   RobotConfigValue (..),
+   Polynomial (..))
   
 where
 
@@ -159,26 +160,32 @@ data RobotParams =
                 robotParamsMaxInitialRotationDeltaAbs :: !Double,
                 robotParamsNoThrustPenaltyCycles :: !Int,
                 robotParamsNoTurnPenaltyCycles :: !Int,
+                robotParamsNoThrustPenaltyMinimum :: !Double,
+                robotParamsNoTurnPenaltyMinimum :: !Double,
+                robotParamsNoThrustPenaltyMaximum :: !Double,
+                robotParamsNoTurnPenaltyMaximum :: !Double,
+                robotParamsNoThrustPenaltyDecay :: !Polynomial,
+                robotParamsNoTurnPenaltyDecay :: !Polynomial,
                 robotParamsKillScore :: !Double,
                 robotParamsHitScoreFactor :: !Double,
                 robotParamsDieScore :: !Double,
                 robotParamsDamagedScoreFactor :: !Double,
                 robotParamsThrustScoreFactor :: !Double,
                 robotParamsTurnScoreFactor :: !Double,
-                robotParamsNoThrustPenaltyScoreFactor :: !Double,
-                robotParamsNoTurnPenaltyScoreFactor :: !Double,
-                robotParamsMutationChance :: !Double,
-                robotParamsMutationReplaceLeafChance :: !Double,
-                robotParamsMutationReplaceNodeChance :: !Double,
-                robotParamsMutationInsertCondChance :: !Double,
-                robotParamsMutationInsertCondAsTrueChance :: !Double,
-                robotParamsMutationInsertBindChance :: !Double,
-                robotParamsMutationRemoveCondChance :: !Double,
-                robotParamsMutationRemoveCondAsTrueChance :: !Double,
-                robotParamsMutationFlipCondChance :: !Double,
-                robotParamsMutationRemoveApplyChance :: !Double,
-                robotParamsMutationFlipApplyChance :: !Double,
-                robotParamsMutationFlipBindChance :: !Double,
+                robotParamsNoThrustPenaltyScore :: !Double,
+                robotParamsNoTurnPenaltyScore :: !Double,
+                robotParamsMutationChance :: !Polynomial,
+                robotParamsMutationReplaceLeafChance :: !Polynomial,
+                robotParamsMutationReplaceNodeChance :: !Polynomial,
+                robotParamsMutationInsertCondChance :: !Polynomial,
+                robotParamsMutationInsertCondAsTrueChance :: !Polynomial,
+                robotParamsMutationInsertBindChance :: !Polynomial,
+                robotParamsMutationRemoveCondChance :: !Polynomial,
+                robotParamsMutationRemoveCondAsTrueChance :: !Polynomial,
+                robotParamsMutationFlipCondChance :: !Polynomial,
+                robotParamsMutationRemoveApplyChance :: !Polynomial,
+                robotParamsMutationFlipApplyChance :: !Polynomial,
+                robotParamsMutationFlipBindChance :: !Polynomial,
                 robotParamsRandomBoolWeight :: !Double,
                 robotParamsRandomIntWeight :: !Double,
                 robotParamsRandomFloatWeight :: !Double,
@@ -228,6 +235,8 @@ data Robot =
           robotHealth :: !Double,
           robotNoThrustCycles :: !Int,
           robotNoTurnCycles :: !Int,
+          robotThrustAcc :: !Double,
+          robotTurnAcc :: !Double,
           robotScore :: !Double }
 
 -- | Shot type
@@ -290,3 +299,6 @@ data RobotConfigEntry = RobotConfigEntry !Text.Text !RobotConfigValue
 -- | Robot config value
 data RobotConfigValue = RobotConfigNum !Double
                       | RobotConfigVector !(Seq.Seq RobotConfigValue)
+
+-- | Polynomial
+newtype Polynomial = Polynomial (Seq.Seq Double)

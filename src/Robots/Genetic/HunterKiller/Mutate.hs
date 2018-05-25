@@ -1,4 +1,4 @@
--- Copyright (c) 2017, Travis Bemann
+-- Copyright (c) 2017-2018, Travis Bemann
 -- All rights reserved.
 -- 
 -- Redistribution and use in source and binary forms, with or without
@@ -36,6 +36,7 @@ module Robots.Genetic.HunterKiller.Mutate
 where
 
 import Robots.Genetic.HunterKiller.Types
+import Robots.Genetic.HunterKiller.Utility
 import qualified Data.Sequence as Seq
 import Data.Sequence ((><))
 import qualified Control.Monad.State.Strict as State
@@ -47,10 +48,11 @@ import Data.Foldable (foldl')
 -- | Mutate an expression.
 mutate :: Int -> Int -> RobotExpr -> State.State RobotMutate RobotExpr
 mutate contextDepth totalDepth expr = do
-  mutationChance <- robotParamsMutationChance <$> robotMutateParams <$> State.get
+  mutationChance <- robotParamsMutationChance <$> robotMutateParams <$>
+                    State.get
   mutateValue <- random
   expr <- mutateSub contextDepth totalDepth expr
-  if mutateValue <= mutationChance
+  if mutateValue <= getProbability mutationChance totalDepth
     then mutateDirect contextDepth totalDepth expr
     else return expr
 
@@ -98,13 +100,13 @@ mutateDirect contextDepth totalDepth expr = do
   probability <- random
   insertCondChance <-
     robotParamsMutationInsertCondChance <$> robotMutateParams <$> State.get
-  if probability <= insertCondChance
+  if probability <= getProbability insertCondChance totalDepth
     then insertCond contextDepth totalDepth expr
     else do
       probability <- random
       insertBindChance <-
         robotParamsMutationInsertBindChance <$> robotMutateParams <$> State.get
-      if probability <= insertBindChance
+      if probability <= getProbability insertBindChance totalDepth
         then insertBind contextDepth totalDepth expr
         else case expr of
                RobotLoad _ -> mutateLeaf contextDepth totalDepth expr
@@ -118,7 +120,7 @@ mutateLeaf contextDepth totalDepth  expr = do
   probability <- random
   replaceLeafChance <-
     robotParamsMutationReplaceLeafChance <$> robotMutateParams <$> State.get
-  if probability <= replaceLeafChance
+  if probability <= getProbability replaceLeafChance totalDepth
     then randomExpr contextDepth totalDepth
     else
       case expr of
@@ -132,7 +134,7 @@ mutateNode contextDepth totalDepth expr = do
   probability <- random
   replaceNodeChance <-
     robotParamsMutationReplaceNodeChance <$> robotMutateParams <$> State.get
-  if probability <= replaceNodeChance
+  if probability <= getProbability replaceNodeChance totalDepth
     then randomExpr contextDepth totalDepth
     else
       case expr of
@@ -153,7 +155,7 @@ mutateBind contextDepth totalDepth boundExprs expr = do
                     robotMutateParams <$> State.get
   probability <- random
   let bindCount = Seq.length boundExprs
-  if probability <= flipBindChance
+  if probability <= getProbability flipBindChance totalDepth
     then
       if bindCount > 0
       then do
@@ -200,7 +202,9 @@ mutateApply contextDepth totalDepth argExprs funcExpr = do
                      robotMutateParams <$> State.get
   probability <- random
   let applyCount = Seq.length argExprs
-  if probability <= removeApplyChance
+      removeApplyChance' = getProbability removeApplyChance totalDepth
+      flipApplyChance' = getProbability flipApplyChance totalDepth
+  if probability <= removeApplyChance'
     then
       if applyCount > 0
       then do
@@ -209,7 +213,7 @@ mutateApply contextDepth totalDepth argExprs funcExpr = do
           Just argExpr -> return argExpr
           Nothing -> error "impossible"
       else return $ RobotConst RobotNull
-    else if probability <= removeApplyChance + flipApplyChance
+    else if probability <= removeApplyChance' + flipApplyChance'
     then
       if applyCount > 0
       then do
@@ -245,14 +249,17 @@ mutateCond contextDepth totalDepth condExpr trueExpr falseExpr = do
                             robotMutateParams <$> State.get
   flipCondChance <- robotParamsMutationFlipCondChance <$>
                     robotMutateParams <$> State.get
+  let removeCondChance' = getProbability removeCondChance totalDepth
+      removeCondAsTrueChance' = getProbability removeCondAsTrueChance totalDepth
+      flipCondChance' = getProbability flipCondChance totalDepth
   probability <- random
-  if probability <= removeCondChance
+  if probability <= removeCondChance'
     then do
       probability <- random
-      if probability <= removeCondAsTrueChance
+      if probability <= removeCondAsTrueChance'
         then return trueExpr
         else return falseExpr
-    else if probability <= removeCondChance + flipCondChance
+    else if probability <= removeCondChance' + flipCondChance'
     then return $ RobotCond condExpr falseExpr trueExpr
     else return $ RobotCond condExpr trueExpr falseExpr
 
@@ -443,7 +450,7 @@ insertCond contextDepth totalDepth expr = do
       condExpr <- randomExpr' contextDepth 1 (totalDepth + 1)
       expr <- mutate contextDepth (totalDepth + 1) expr
       otherExpr <- randomExpr' contextDepth 1 (totalDepth + 1)
-      if probability <= insertCondAsTrueChance
+      if probability <= getProbability insertCondAsTrueChance totalDepth
         then return $ RobotCond condExpr expr otherExpr
         else return $ RobotCond condExpr otherExpr expr
     else return expr
@@ -518,3 +525,8 @@ valueDepth (RobotVector values) =
 valueDepth (RobotClosure _ _ _) = 1
 valueDepth (RobotIntrinsic _) = 1
 valueDepth (RobotOutput value _) = 1 + valueDepth value
+
+-- | Get a probability for a depth
+getProbability :: Polynomial -> Int -> Double
+getProbability polynomial =
+  max 0.0 . min 1.0 . evalPolynomial polynomial . fromIntegral

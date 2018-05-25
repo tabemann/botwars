@@ -105,26 +105,37 @@ defaultParams =
                 robotParamsMaxInitialRotationDeltaAbs = pi / 50.0,
                 robotParamsNoThrustPenaltyCycles = 100,
                 robotParamsNoTurnPenaltyCycles = 100,
+                robotParamsNoThrustPenaltyMinimum = 0.125,
+                robotParamsNoTurnPenaltyMinimum = 0.125,
+                robotParamsNoThrustPenaltyMaximum = 2.0,
+                robotParamsNoTurnPenaltyMaximum = 2.0,
+                robotParamsNoThrustPenaltyDecay = mkPolynomial [0.0, 0.95],
+                robotParamsNoTurnPenaltyDecay = mkPolynomial [0.0, 0.95],
                 robotParamsKillScore = 10.0,
                 robotParamsHitScoreFactor = 1.0,
                 robotParamsDieScore = -1.0,
                 robotParamsDamagedScoreFactor = -0.25,
                 robotParamsThrustScoreFactor = 0.075,
                 robotParamsTurnScoreFactor = 0.075,
-                robotParamsNoThrustPenaltyScoreFactor = -0.125,
-                robotParamsNoTurnPenaltyScoreFactor = -0.125,
-                robotParamsMutationChance = 0.05,
-                robotParamsMutationReplaceLeafChance = 0.25,
-                robotParamsMutationReplaceNodeChance = 0.1,
-                robotParamsMutationInsertCondChance = 0.05,
-                robotParamsMutationInsertCondAsTrueChance = 0.75,
-                robotParamsMutationInsertBindChance = 0.05,
-                robotParamsMutationRemoveCondChance = 0.1,
-                robotParamsMutationRemoveCondAsTrueChance = 0.75,
-                robotParamsMutationFlipCondChance = 0.5,
-                robotParamsMutationRemoveApplyChance = 0.1,
-                robotParamsMutationFlipApplyChance = 0.5,
-                robotParamsMutationFlipBindChance = 0.5,
+                robotParamsNoThrustPenaltyScore = -0.25,
+                robotParamsNoTurnPenaltyScore = -0.25,
+                robotParamsMutationChance =
+                  mkPolynomial [0.025, 0.005],
+                robotParamsMutationReplaceLeafChance =
+                  mkPolynomial [0.1, 0.01],
+                robotParamsMutationReplaceNodeChance =
+                  mkPolynomial [0.05, 0.015],
+                robotParamsMutationInsertCondChance = mkPolynomial [0.05],
+                robotParamsMutationInsertCondAsTrueChance = mkPolynomial [0.75],
+                robotParamsMutationInsertBindChance = mkPolynomial [0.05],
+                robotParamsMutationRemoveCondChance =
+                  mkPolynomial [0.05, 0.01],
+                robotParamsMutationRemoveCondAsTrueChance = mkPolynomial [0.75],
+                robotParamsMutationFlipCondChance = mkPolynomial [0.5],
+                robotParamsMutationRemoveApplyChance =
+                  mkPolynomial [0.05, 0.01],
+                robotParamsMutationFlipApplyChance = mkPolynomial [0.5],
+                robotParamsMutationFlipBindChance = mkPolynomial [0.5],
                 robotParamsRandomBoolWeight = 0.2,
                 robotParamsRandomIntWeight = 0.2,
                 robotParamsRandomFloatWeight = 0.4,
@@ -314,6 +325,24 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
   else if name == "noTurnPenaltyCycles"
   then parseLoBoundInt 0 entry $
        \value -> params { robotParamsNoTurnPenaltyCycles = value }
+  else if name == "noThrustPenaltyMinimum"
+  then parseLoBoundFloat 0.0 entry $
+       \value -> params { robotParamsNoThrustPenaltyMinimum = value }
+  else if name == "noTurnPenaltyMinimum"
+  then parseLoBoundFloat 0.0 entry $
+       \value -> params { robotParamsNoTurnPenaltyMinimum = value }
+  else if name == "noThrustPenaltyMaximum"
+  then parseLoBoundFloat 0.0 entry $
+       \value -> params { robotParamsNoThrustPenaltyMaximum = value }
+  else if name == "noTurnPenaltyMaximum"
+  then parseLoBoundFloat 0.0 entry $
+       \value -> params { robotParamsNoTurnPenaltyMaximum = value }
+  else if name == "noThrustPenaltyDecay"
+  then parsePolynomial entry $
+       \value -> params { robotParamsNoThrustPenaltyDecay = value }
+  else if name == "noTurnPenaltyDecay"
+  then parsePolynomial entry $
+       \value -> params { robotParamsNoTurnPenaltyDecay = value }
   else if name == "killScore"
   then parseFloat entry $
        \value -> params { robotParamsKillScore = value }
@@ -332,47 +361,47 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
   else if name == "turnScoreFactor"
   then parseFloat entry $
        \value -> params { robotParamsTurnScoreFactor = value }
-  else if name == "noThrustPenaltyScoreFactor"
+  else if name == "noThrustPenaltyScore"
   then parseFloat entry $
-       \value -> params { robotParamsNoThrustPenaltyScoreFactor = value }
-  else if name == "noTurnPenaltyScoreFactor"
+       \value -> params { robotParamsNoThrustPenaltyScore = value }
+  else if name == "noTurnPenaltyScore"
   then parseFloat entry $
-       \value -> params { robotParamsNoTurnPenaltyScoreFactor = value }
+       \value -> params { robotParamsNoTurnPenaltyScore = value }
   else if name == "mutationChance"
-  then parseBoundFloat (0.0, 1.0) entry $
+  then parsePolynomial entry $
        \value -> params { robotParamsMutationChance = value }
   else if name == "mutationReplaceLeafChance"
-  then parseBoundFloat (0.0, 1.0) entry $
+  then parsePolynomial entry $
        \value -> params { robotParamsMutationReplaceLeafChance = value }
   else if name == "mutationReplaceNodeChance"
-  then parseBoundFloat (0.0, 1.0) entry $
+  then parsePolynomial entry $
        \value -> params { robotParamsMutationReplaceNodeChance = value }
   else if name == "mutationInsertCondChance"
-  then parseBoundFloat (0.0, 1.0) entry $
+  then parsePolynomial entry $
        \value -> params { robotParamsMutationInsertCondChance = value }
   else if name == "mutationInsertCondAsTrueChance"
-  then parseBoundFloat (0.0, 1.0) entry $
+  then parsePolynomial entry $
        \value -> params { robotParamsMutationInsertCondAsTrueChance = value }
   else if name == "mutationInsertBindChance"
-  then parseBoundFloat (0.0, 1.0) entry $
+  then parsePolynomial entry $
        \value -> params { robotParamsMutationInsertBindChance = value }
   else if name == "mutationRemoveCondChance"
-  then parseBoundFloat (0.0, 1.0) entry $
+  then parsePolynomial entry $
        \value -> params { robotParamsMutationRemoveCondChance = value }
   else if name == "mutationRemoveCondAsTrueChance"
-  then parseBoundFloat (0.0, 1.0) entry $
+  then parsePolynomial entry $
        \value -> params { robotParamsMutationRemoveCondAsTrueChance = value }
   else if name == "mutationFlipCondChance"
-  then parseBoundFloat (0.0, 1.0) entry $
+  then parsePolynomial entry $
        \value -> params { robotParamsMutationFlipCondChance = value }
   else if name == "mutationRemoveApplyChance"
-  then parseBoundFloat (0.0, 1.0) entry $
+  then parsePolynomial entry $
        \value -> params { robotParamsMutationRemoveApplyChance = value }
   else if name == "mutationFlipApplyChance"
-  then parseBoundFloat (0.0, 1.0) entry $
+  then parsePolynomial entry $
        \value -> params { robotParamsMutationFlipApplyChance = value }
   else if name == "mutationFlipBindChance"
-  then parseBoundFloat (0.0, 1.0) entry $
+  then parsePolynomial entry $
        \value -> params { robotParamsMutationFlipBindChance = value }
   else if name == "randomBoolWeight"
   then parseFloat entry $
@@ -562,7 +591,27 @@ parseReproduction (RobotConfigEntry name (RobotConfigVector values)) func =
         convertRobotConfigValueIntoInt _ = 0
 parseReproduction (RobotConfigEntry name _) _ =
   Left .  Text.pack $ Printf.printf "%s: not a vector" name
-  
+
+-- | Parse a polynomial
+parsePolynomial :: RobotConfigEntry -> (Polynomial -> RobotParams) ->
+                   Either Text.Text RobotParams
+parsePolynomial (RobotConfigEntry name (RobotConfigVector values)) func =
+  if Seq.length values >= 1
+  then
+    case Seq.findIndexL isRobotConfigValueNotNumber values of
+      Just _ -> Left . Text.pack $ Printf.printf
+                "%s: coefficient not a number" name
+      Nothing -> Right . func . Polynomial $
+                 fmap convertRobotConfigValueIntoDouble values
+  else Left . Text.pack $
+       Printf.printf "%s: does not have at least one coefficient" name
+  where isRobotConfigValueNotNumber (RobotConfigNum _) = True
+        isRobotConfigValueNotNumber _ = False
+        convertRobotConfigValueIntoDouble (RobotConfigNum value) = value
+        convertRobotConfigValueIntoDouble _ = 0.0
+parsePolynomial (RobotConfigEntry name (RobotConfigNum value)) func =
+  Right . func $ mkPolynomial [value]
+
 -- | Parse configuration.
 parseConfig :: Atto.Parser (Seq.Seq RobotConfigEntry)
 parseConfig =

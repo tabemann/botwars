@@ -125,6 +125,11 @@ defaultParams =
                   mkPolynomial [0.05, 0.01],
                 robotParamsMutationReplaceNodeChance =
                   mkPolynomial [0.025, 0.015],
+                robotParamsMutationRandomLeafChance = mkPolynomial [0.1],
+                robotParamsMutationModifyBoolChance = mkPolynomial [0.25],
+                robotParamsMutationModifyIntFactor = mkPolynomial [2.0],
+                robotParamsMutationModifyFloatFactor = mkPolynomial [0.5],
+                robotParamsMutationModifyVectorFactor = mkPolynomial [2.0],
                 robotParamsMutationInsertCondChance = mkPolynomial [0.05],
                 robotParamsMutationInsertCondAsTrueChance = mkPolynomial [0.75],
                 robotParamsMutationInsertBindChance = mkPolynomial [0.05],
@@ -376,6 +381,21 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
   else if name == "mutationReplaceNodeChance"
   then parsePolynomial entry $
        \value -> params { robotParamsMutationReplaceNodeChance = value }
+  else if name == "mutationRandomLeafChance"
+  then parsePolynomial entry $
+       \value -> params { robotParamsMutationRandomLeafChance = value }
+  else if name == "mutationModifyBoolChance"
+  then parsePolynomial entry $
+       \value -> params { robotParamsMutationModifyBoolChance = value }
+  else if name == "mutationModifyIntFactor"
+  then parsePolynomial entry $
+       \value -> params { robotParamsMutationReplaceLeafChance = value }
+  else if name == "mutationModifyFloatFactor"
+  then parsePolynomial entry $
+       \value -> params { robotParamsMutationReplaceLeafChance = value }
+  else if name == "mutationModifyVectorFactor"
+  then parsePolynomial entry $
+       \value -> params { robotParamsMutationReplaceLeafChance = value }
   else if name == "mutationInsertCondChance"
   then parsePolynomial entry $
        \value -> params { robotParamsMutationInsertCondChance = value }

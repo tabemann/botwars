@@ -42,7 +42,8 @@ import Data.Sequence ((><))
 import qualified Control.Monad.State.Strict as State
 import qualified System.Random as Random
 import Data.Functor ((<$>))
-import Control.Monad (mapM)
+import Control.Monad (mapM,
+                      replicateM)
 import Data.Foldable (foldl')
 
 -- | Mutate an expression.
@@ -126,7 +127,15 @@ mutateLeaf contextDepth totalDepth  expr = do
       case expr of
         RobotLoad _ -> RobotLoad <$> randomR (0, contextDepth - 1)
         RobotSpecialConst _ -> randomSpecialConst
-        _ -> RobotConst <$> randomValue (totalDepth + 1)
+        RobotConst value -> do
+          probability <- random
+          randomLeafChance <-
+            robotParamsMutationRandomLeafChance <$> robotMutateParams <$>
+            State.get
+          if probability <= getProbability randomLeafChance totalDepth
+            then RobotConst <$> randomValue (totalDepth + 1)
+            else RobotConst <$> modifyValue (totalDepth + 1) value
+        _ -> error "impossible"
 
 -- | Directly mutate a node expression.
 mutateNode :: Int -> Int -> RobotExpr -> State.State RobotMutate RobotExpr
@@ -383,7 +392,53 @@ randomSimple contextDepth totalDepth = do
     else if exprValue < specialConstWeight
     then randomSpecialConst
     else RobotLoad <$> randomR (0, contextDepth - 1)
-  
+
+-- | Modify a value randomly.
+modifyValue :: Int -> RobotValue -> State.State RobotMutate RobotValue
+modifyValue _ RobotNull = return RobotNull
+modifyValue totalDepth (RobotBool value) = do
+  probability <- random
+  modifyBoolChance <-
+    robotParamsMutationModifyBoolChance . robotMutateParams <$> State.get
+  if probability <= getProbability modifyBoolChance totalDepth
+    then return . RobotBool $ not value
+    else return $ RobotBool value
+modifyValue totalDepth (RobotInt value) = do
+  randomFactor <- random
+  let randomFactor' = (randomFactor - 0.5) * 2.0
+  modifyIntFactor <-
+    robotParamsMutationModifyIntFactor . robotMutateParams <$> State.get
+  return . RobotInt $
+    value + floor ((evalPolynomial modifyIntFactor (fromIntegral totalDepth))
+                   * randomFactor')
+modifyValue totalDepth (RobotFloat value) = do
+  randomFactor <- random
+  let randomFactor' = (randomFactor - 0.5) * 2.0
+  modifyFloatFactor <-
+    robotParamsMutationModifyFloatFactor . robotMutateParams <$> State.get
+  return . RobotFloat $
+    value + ((evalPolynomial modifyFloatFactor (fromIntegral totalDepth))
+             * randomFactor')
+modifyValue totalDepth (RobotVector values) = do
+  values <- mapM (modifyValue (totalDepth + 1)) values
+  randomFactor <- random
+  let randomFactor' = (randomFactor - 0.5) * 2.0
+  modifyVectorFactor <-
+    robotParamsMutationModifyVectorFactor . robotMutateParams <$> State.get
+  let change = floor ((evalPolynomial modifyVectorFactor
+                       (fromIntegral totalDepth)) * randomFactor')
+  if Seq.length values + change > 0
+    then if change > 0
+         then do
+            newValues <-
+              Seq.fromList <$> replicateM change (randomValue $ totalDepth + 1)
+            return . RobotVector $ values >< newValues
+         else if change < 0
+              then return . RobotVector $ Seq.drop (-change) values
+              else return $ RobotVector values
+    else return $ RobotVector Seq.empty
+modifyValue _ value = return value
+
 -- | Generate a random value.
 randomValue :: Int -> State.State RobotMutate RobotValue
 randomValue totalDepth = do

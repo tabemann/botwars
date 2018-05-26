@@ -96,6 +96,22 @@ drawRobot w h params robot = do
            Cairo.textExtentsYbearing extents)
   Cairo.moveTo labelX labelY
   Cairo.showText label
+  let score = Text.pack . printf "%.4f" $ robotScore robot
+  extents <- Cairo.textExtents score
+  let (scoreX, scoreY) =
+        subVector
+          (convertCoord (addVector (robotLocation robot)
+                         (mulVector
+                          (robotParamsScoreRadius params * radius)
+                           (cos $ robotParamsScoreAngle params,
+                            sin $ robotParamsScoreAngle params)))
+           w h)
+          ((Cairo.textExtentsWidth extents / 2.0) +
+           Cairo.textExtentsXbearing extents,
+           (Cairo.textExtentsHeight extents / 2.0) +
+           Cairo.textExtentsYbearing extents)
+  Cairo.moveTo scoreX scoreY
+  Cairo.showText score
   
 -- | Draw a shot.
 drawShot :: Double -> Double -> RobotParams -> Shot -> Cairo.Render ()

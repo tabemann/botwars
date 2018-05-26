@@ -59,6 +59,8 @@ defaultParams =
                 robotParamsAimRadius = 4.0,
                 robotParamsLabelRadius = 5.0,
                 robotParamsLabelAngle = pi / 4.0,
+                robotParamsScoreRadius = 5.0,
+                robotParamsScoreAngle = -(pi / 4.0),
                 robotParamsBaseHitTransferFactor = 0.0025,
                 robotParamsEnergyHitTransferFactor = 0.005,
                 robotParamsBaseRecoil = 0.0075,
@@ -112,13 +114,13 @@ defaultParams =
                 robotParamsNoThrustPenaltyDecay = mkPolynomial [0.0, 0.95],
                 robotParamsNoTurnPenaltyDecay = mkPolynomial [0.0, 0.95],
                 robotParamsKillScore = 10.0,
-                robotParamsHitScoreFactor = 1.0,
+                robotParamsHitScoreFactor = 3.0,
                 robotParamsDieScore = -1.0,
                 robotParamsDamagedScoreFactor = -0.25,
-                robotParamsThrustScoreFactor = 0.075,
-                robotParamsTurnScoreFactor = 0.075,
-                robotParamsNoThrustPenaltyScore = -0.25,
-                robotParamsNoTurnPenaltyScore = -0.25,
+                robotParamsThrustScoreFactor = 0.01,
+                robotParamsTurnScoreFactor = 0.01,
+                robotParamsNoThrustPenaltyScore = -1.0,
+                robotParamsNoTurnPenaltyScore = -1.0,
                 robotParamsMutationChance =
                   mkPolynomial [0.025, 0.005],
                 robotParamsMutationReplaceLeafChance =
@@ -192,6 +194,12 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
   else if name == "labelAngle"
   then parseFloat entry $
        \value -> params { robotParamsLabelAngle = value }
+  else if name == "scoreRadius"
+  then parseLoBoundFloat 0.0 entry $
+       \value -> params { robotParamsScoreRadius = value }
+  else if name == "scoreAngle"
+  then parseFloat entry $
+       \value -> params { robotParamsScoreAngle = value }
   else if name == "baseHitTransferFactor"
   then parseLoBoundFloat 0.0 entry $
        \value -> params { robotParamsBaseHitTransferFactor = value }

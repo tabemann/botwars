@@ -114,6 +114,8 @@ data RobotParams =
                 robotParamsAimRadius :: !Double,
                 robotParamsLabelRadius :: !Double,
                 robotParamsLabelAngle :: !Double,
+                robotParamsScoreRadius :: !Double,
+                robotParamsScoreAngle :: !Double,
                 robotParamsBaseHitTransferFactor :: !Double,
                 robotParamsEnergyHitTransferFactor :: !Double,
                 robotParamsBaseRecoil :: !Double,

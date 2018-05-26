@@ -337,21 +337,21 @@ updateRobot :: Robot -> RobotValue -> RobotAction -> RobotParams ->
   (Robot, Maybe Shot)
 updateRobot robot stateData action params =
   let generalEnergy =
-        min (robotGeneralEnergy robot + robotParamsGeneralEnergyGain params) 1.0
+        min 1.0 $ robotGeneralEnergy robot + robotParamsGeneralEnergyGain params
       weaponEnergy =
-        min (robotWeaponEnergy robot + robotParamsWeaponEnergyGain params) 1.0
+        min 1.0 $ robotWeaponEnergy robot + robotParamsWeaponEnergyGain params
       health =
-        min (robotHealth robot + robotParamsHealthGain params) 1.0
+        min 1.0 $ robotHealth robot + robotParamsHealthGain params
       locationDelta =
         applyDeltaVectorFriction (robotLocationDelta robot)
           (robotParamsLocationFriction params)
       rotationDelta =
         robotRotationDelta robot * (1.0 - robotParamsRotationFriction params)
       turnValue = robotActionTurnPower action
-      turnPower = min generalEnergy (abs turnValue)
+      turnPower = min generalEnergy $ abs turnValue
       generalEnergy' = generalEnergy - turnPower
       thrustValue = robotActionThrustPower action
-      thrustPower = min generalEnergy' (abs thrustValue)
+      thrustPower = min generalEnergy' $ abs thrustValue
       generalEnergy'' = generalEnergy' - thrustPower
       rotationDelta' = rotationDelta + (turnPower * sign turnValue *
                                         robotParamsTurnFactor params)

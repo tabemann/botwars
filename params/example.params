@@ -1,8 +1,0 @@
-baseRecoil = 0.0
-energyRecoilFactor = 0.01
-generalEnergyGain = 0.1
-thrustFactor = 0.005
-minKills = 50
-locationFriction = 0.1
-shotMinFireEnergy = 0.5
-weaponEnergyGain = 0.0025

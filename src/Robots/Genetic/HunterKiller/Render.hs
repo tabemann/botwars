@@ -1,4 +1,4 @@
--- Copyright (c) 2017, Travis Bemann
+-- Copyright (c) 2017-2018, Travis Bemann
 -- All rights reserved.
 -- 
 -- Redistribution and use in source and binary forms, with or without
@@ -46,6 +46,7 @@ drawWorld world w h = do
   mapM_ (drawRobot w h (robotWorldParams world)) (robotWorldRobots world)
   mapM_ (drawShot w h (robotWorldParams world)) (robotWorldShots world)
   mapM_ (drawHit w h (robotWorldParams world)) (robotWorldHits world)
+  drawOverlay w h world
 
 -- | Draw a robot.
 drawRobot :: Double -> Double -> RobotParams -> Robot -> Cairo.Render ()
@@ -126,6 +127,20 @@ drawHit w h params hit = do
   Cairo.arc centerX centerY (radius * w) 0.0 (2.0 * pi)
   Cairo.setSourceRGBA 1.0 0.0 0.0 1.0
   Cairo.stroke
+
+-- | Draw overlay.
+drawOverlay :: Double -> Double -> RobotWorld -> Cairo.Render ()
+drawOverlay w h world = do
+  Cairo.setSourceRGB 0.0 0.0 0.0
+  Cairo.selectFontFace ("sans-serif" :: Text.Text) Cairo.FontSlantNormal
+    Cairo.FontWeightNormal
+  Cairo.setFontSize 24.0
+  let label = Text.pack $ printf "Cycles: %d Kills: %d" (robotWorldCycles world)
+                          (robotWorldKills world)
+  extents <- Cairo.textExtents label
+  let labelY = Cairo.textExtentsHeight extents
+  Cairo.moveTo 0.0 labelY
+  Cairo.showText label
   
 -- | Convert a coordinate.
 convertCoord :: (Double, Double) -> Double -> Double -> (Double, Double)

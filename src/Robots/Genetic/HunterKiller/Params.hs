@@ -105,8 +105,8 @@ defaultParams =
                 robotParamsMaxInitialRotationDeltaAbs = pi / 50.0,
                 robotParamsNoThrustPenaltyCycles = 100,
                 robotParamsNoTurnPenaltyCycles = 100,
-                robotParamsNoThrustPenaltyMinimum = 0.125,
-                robotParamsNoTurnPenaltyMinimum = 0.125,
+                robotParamsNoThrustPenaltyMinimum = 0.25,
+                robotParamsNoTurnPenaltyMinimum = 0.25,
                 robotParamsNoThrustPenaltyMaximum = 2.0,
                 robotParamsNoTurnPenaltyMaximum = 2.0,
                 robotParamsNoThrustPenaltyDecay = mkPolynomial [0.0, 0.95],
@@ -122,9 +122,9 @@ defaultParams =
                 robotParamsMutationChance =
                   mkPolynomial [0.025, 0.005],
                 robotParamsMutationReplaceLeafChance =
-                  mkPolynomial [0.1, 0.01],
+                  mkPolynomial [0.05, 0.01],
                 robotParamsMutationReplaceNodeChance =
-                  mkPolynomial [0.05, 0.015],
+                  mkPolynomial [0.025, 0.015],
                 robotParamsMutationInsertCondChance = mkPolynomial [0.05],
                 robotParamsMutationInsertCondAsTrueChance = mkPolynomial [0.75],
                 robotParamsMutationInsertBindChance = mkPolynomial [0.05],

@@ -61,6 +61,8 @@ defaultParams =
                 robotParamsLabelAngle = pi / 4.0,
                 robotParamsScoreRadius = 5.0,
                 robotParamsScoreAngle = -(pi / 4.0),
+                robotParamsKillsRadius = 5.0,
+                robotParamsKillsAngle = pi * 0.75,
                 robotParamsBaseHitTransferFactor = 0.0025,
                 robotParamsEnergyHitTransferFactor = 0.005,
                 robotParamsBaseRecoil = 0.0075,
@@ -114,13 +116,13 @@ defaultParams =
                 robotParamsNoThrustPenaltyDecay = mkPolynomial [0.0, 0.95],
                 robotParamsNoTurnPenaltyDecay = mkPolynomial [0.0, 0.95],
                 robotParamsKillScore = 10.0,
-                robotParamsHitScoreFactor = 3.0,
-                robotParamsDieScore = -1.0,
+                robotParamsHitScoreFactor = 10.0,
+                robotParamsDieScore = -4.0,
                 robotParamsDamagedScoreFactor = -3.0,
                 robotParamsThrustScoreFactor = 0.01,
                 robotParamsTurnScoreFactor = 0.01,
                 robotParamsNoThrustPenaltyScore = -1.0,
-                robotParamsNoTurnPenaltyScore = -1.0,
+                robotParamsNoTurnPenaltyScore = -1.5,
                 robotParamsMutationChance =
                   mkPolynomial [0.025, 0.005],
                 robotParamsMutationReplaceLeafChance =
@@ -200,6 +202,12 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
   else if name == "scoreAngle"
   then parseFloat entry $
        \value -> params { robotParamsScoreAngle = value }
+  else if name == "killsRadius"
+  then parseLoBoundFloat 0.0 entry $
+       \value -> params { robotParamsKillsRadius = value }
+  else if name == "killsAngle"
+  then parseFloat entry $
+       \value -> params { robotParamsKillsAngle = value }
   else if name == "baseHitTransferFactor"
   then parseLoBoundFloat 0.0 entry $
        \value -> params { robotParamsBaseHitTransferFactor = value }

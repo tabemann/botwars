@@ -112,6 +112,23 @@ drawRobot w h params robot = do
            Cairo.textExtentsYbearing extents)
   Cairo.moveTo scoreX scoreY
   Cairo.showText score
+  Cairo.setSourceRGB 1.0 0.0 0.0
+  let kills = Text.pack . printf "%d" $ robotKills robot
+  extents <- Cairo.textExtents kills
+  let (killsX, killsY) =
+        subVector
+          (convertCoord (addVector (robotLocation robot)
+                         (mulVector
+                          (robotParamsKillsRadius params * radius)
+                           (cos $ robotParamsKillsAngle params,
+                            sin $ robotParamsKillsAngle params)))
+           w h)
+          ((Cairo.textExtentsWidth extents / 2.0) +
+           Cairo.textExtentsXbearing extents,
+           (Cairo.textExtentsHeight extents / 2.0) +
+           Cairo.textExtentsYbearing extents)
+  Cairo.moveTo killsX killsY
+  Cairo.showText kills
   
 -- | Draw a shot.
 drawShot :: Double -> Double -> RobotParams -> Shot -> Cairo.Render ()

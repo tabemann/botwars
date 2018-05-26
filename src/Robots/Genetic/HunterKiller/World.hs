@@ -257,16 +257,18 @@ respawnRobot robot = do
       roundIndex = robotRoundIndex robot
       program = robotExpr robot
       score = robotScore robot + robotParamsDieScore params
+      kills = robotKills robot
       gen = robotWorldRandom world
-      (robot', gen') = generateRobot index roundIndex program score gen params
+      (robot', gen') =
+        generateRobot index roundIndex program score kills gen params
   State.modify $ (\world -> world { robotWorldNextRobotIndex = index + 1,
                                     robotWorldRandom = gen' })
   return robot'
 
 -- | Generate a robot.
-generateRobot :: Int -> Int -> RobotExpr -> Double -> Random.StdGen ->
+generateRobot :: Int -> Int -> RobotExpr -> Double -> Int -> Random.StdGen ->
                  RobotParams -> (Robot, Random.StdGen)
-generateRobot index roundIndex program score gen params = 
+generateRobot index roundIndex program score kills gen params = 
   let (generalEnergy, gen') =
         Random.randomR (robotParamsMinInitialGeneralEnergy params,
                         robotParamsMaxInitialGeneralEnergy params) gen
@@ -306,7 +308,8 @@ generateRobot index roundIndex program score gen params =
               robotNoTurnCycles = 0,
               robotThrustAcc = 0.0,
               robotTurnAcc = 0.0,
-              robotScore = score },
+              robotScore = score,
+              robotKills = kills },
       gen''''''''')
 
 -- | Update robots for kills.
@@ -314,7 +317,8 @@ updateRobotForKills :: Seq.Seq Int -> RobotParams -> Robot -> Robot
 updateRobotForKills kills params robot =
   foldl' (\robot kill -> if kill == robotIndex robot
                          then robot { robotScore = robotScore robot +
-                                                   robotParamsKillScore params }
+                                                   robotParamsKillScore params,
+                                      robotKills = robotKills robot + 1 }
                          else robot)
     robot kills
 

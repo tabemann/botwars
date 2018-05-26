@@ -242,7 +242,7 @@ setupRobot :: RobotExpr -> Int -> State.State RobotCont Robot
 setupRobot program index = do
   params <- robotContParams <$> State.get
   gen <- robotContRandom <$> State.get
-  let (robot, gen') = generateRobot index index program 0.0 gen params
+  let (robot, gen') = generateRobot index index program 0.0 0 gen params
   State.modify $ \contState -> contState { robotContRandom = gen' }
   return robot
   

@@ -116,6 +116,8 @@ data RobotParams =
                 robotParamsLabelAngle :: !Double,
                 robotParamsScoreRadius :: !Double,
                 robotParamsScoreAngle :: !Double,
+                robotParamsKillsRadius :: !Double,
+                robotParamsKillsAngle :: !Double,
                 robotParamsBaseHitTransferFactor :: !Double,
                 robotParamsEnergyHitTransferFactor :: !Double,
                 robotParamsBaseRecoil :: !Double,
@@ -244,7 +246,8 @@ data Robot =
           robotNoTurnCycles :: !Int,
           robotThrustAcc :: !Double,
           robotTurnAcc :: !Double,
-          robotScore :: !Double }
+          robotScore :: !Double,
+          robotKills :: !Int }
 
 -- | Shot type
 data Shot =

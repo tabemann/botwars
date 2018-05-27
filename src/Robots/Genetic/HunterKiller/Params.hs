@@ -56,7 +56,11 @@ import Text.Printf as Printf
 defaultParams :: RobotParams
 defaultParams =
   RobotParams { robotParamsMaxCyclesPerSecond = 100.0,
-                robotParamsAutoSave = True,
+                robotParamsAutoSaveMostKills = True,
+                robotParamsAutoSaveHighestScore = True,
+                robotParamsAutoSaveHighestScoreIndividual = True,
+                robotParamsAlwaysMoreKills = False,
+                robotParamsAlwaysHigherScore = False,
                 robotParamsOversizeRadius = 2.0,
                 robotParamsAimRadius = 4.0,
                 robotParamsLabelRadius = 5.0,
@@ -186,9 +190,21 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
   if name ==  "maxCyclesPerSecond"
   then parseLoBoundFloat 0.0 entry $
        \value -> params { robotParamsMaxCyclesPerSecond = value }
-  else if name == "autoSave"
+  else if name == "autoSaveMostKills"
   then parseBool entry $
-       \value -> params { robotParamsAutoSave = value }
+       \value -> params { robotParamsAutoSaveMostKills = value }
+  else if name == "autoSaveHighestScore"
+  then parseBool entry $
+       \value -> params { robotParamsAutoSaveHighestScore = value }
+  else if name == "autoSaveHighestScoreIndividual"
+  then parseBool entry $
+       \value -> params { robotParamsAutoSaveHighestScoreIndividual = value }
+  else if name == "alwaysMoreKills"
+  then parseBool entry $
+       \value -> params { robotParamsAlwaysMoreKills = value }
+  else if name == "alwaysHigherScore"
+  then parseBool entry $
+       \value -> params { robotParamsAlwaysHigherScore = value }
   else if name == "oversizeRadius"
   then parseLoBoundFloat 0.0 entry $
        \value -> params { robotParamsOversizeRadius = value }

@@ -1,0 +1,4 @@
+autoSaveHighestScore = true
+autoSaveHighestScoreIndividual = true
+alwaysMoreKills = false
+alwaysHigherScore = true

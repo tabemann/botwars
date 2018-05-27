@@ -89,7 +89,9 @@ data RobotCont =
               robotContWorld :: !(Maybe RobotWorld),
               robotContRounds :: !Int,
               robotContLastMaxKills :: !Int,
+              robotContLastMaxScore :: !Double,
               robotContAutoSave :: !(Maybe (RobotWorld, Int)),
+              robotContAutoSaveIndividual :: !(Maybe (Robot, Int)),
               robotContPrograms :: !(Seq.Seq RobotExpr),
               robotContPrevWorlds :: !(Seq.Seq RobotWorld),
               robotContSavedWorlds :: !(Seq.Seq RobotWorld) }
@@ -113,7 +115,11 @@ data RobotMutate =
 -- | Robot parameters
 data RobotParams =
   RobotParams { robotParamsMaxCyclesPerSecond :: !Double,
-                robotParamsAutoSave :: !Bool,
+                robotParamsAutoSaveMostKills :: !Bool,
+                robotParamsAutoSaveHighestScore :: !Bool,
+                robotParamsAutoSaveHighestScoreIndividual :: !Bool,
+                robotParamsAlwaysMoreKills :: !Bool,
+                robotParamsAlwaysHigherScore :: !Bool,
                 robotParamsOversizeRadius :: !Double,
                 robotParamsAimRadius :: !Double,
                 robotParamsLabelRadius :: !Double,

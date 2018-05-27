@@ -60,7 +60,9 @@ initCont programs params gen = do
               robotContWorld = Nothing,
               robotContRounds = 0,
               robotContLastMaxKills = 0,
+              robotContLastMaxScore = 0.0,
               robotContAutoSave = Nothing,
+              robotContAutoSaveIndividual = Nothing,
               robotContPrevWorlds = Seq.empty,
               robotContPrograms = programs,
               robotContSavedWorlds = Seq.empty }
@@ -71,7 +73,8 @@ executeCycle cont =
   State.runState executeCycle' cont
   where
     executeCycle' = do
-      State.modify $ \cont -> cont { robotContAutoSave = Nothing }
+      State.modify $ \cont -> cont { robotContAutoSave = Nothing,
+                                     robotContAutoSaveIndividual = Nothing }
       world <- robotContWorld <$> State.get
       case world of
         Nothing -> do
@@ -101,7 +104,21 @@ executeCycle cont =
                            prevWorlds
                       else prevWorlds
                  Nothing -> Seq.empty }
-                 
+
+-- | Find if there is a robot with a higher score.
+getHighestScoreRobot :: State.State RobotCont (Maybe Robot)
+getHighestScoreRobot = do
+  world <- robotContWorld <$> State.get
+  lastMaxScore <- robotContLastMaxScore <$> State.get
+  case world of
+    Just world -> return . snd . foldl' findHighestScore
+                  (lastMaxScore, Nothing) $ robotWorldRobots world
+    Nothing -> return Nothing
+  where findHighestScore last@(lastScore, lastRobot) robot =
+          if robotScore robot >= lastScore
+          then (robotScore robot, Just robot)
+          else last
+
 -- | Start the next round
 startNextRound :: State.State RobotCont ()
 startNextRound = do
@@ -111,10 +128,22 @@ startNextRound = do
       Just world -> return $ cleanupWorld world
       Nothing -> error "impossible"
   savedWorlds <- robotContSavedWorlds <$> State.get
-  minKills <- robotParamsMinKills <$> robotContParams <$> State.get
+  minKills <- robotParamsMinKills . robotContParams <$> State.get
   savedWorldCount <-
-    robotParamsSavedWorldCount <$> robotContParams <$> State.get
-  if robotWorldKills world >= minKills
+    robotParamsSavedWorldCount . robotContParams <$> State.get
+  lastMaxKills <- robotContLastMaxKills <$> State.get
+  alwaysMoreKills <- robotParamsAlwaysMoreKills . robotContParams <$> State.get
+  alwaysHigherScore <-
+    robotParamsAlwaysHigherScore . robotContParams <$> State.get
+  highestScoreRobot <- getHighestScoreRobot
+  let hasHighestScoreRobot =
+        case highestScoreRobot of
+          Just _ -> True
+          Nothing -> False
+  if (not alwaysMoreKills && not alwaysHigherScore &&
+      robotWorldKills world >= minKills) ||
+     (alwaysMoreKills && robotWorldKills world >= lastMaxKills) ||
+     (alwaysHigherScore && hasHighestScoreRobot)
     then do
       State.modify $ \cont -> cont { robotContSavedWorlds =
                                        Seq.take savedWorldCount
@@ -125,8 +154,9 @@ startNextRound = do
         Just savedWorld -> do
           let savedWorld' =
                 savedWorld { robotWorldRandom = robotWorldRandom world }
+              dropCount = if alwaysMoreKills || alwaysHigherScore then 0 else 1
           State.modify $ \cont -> cont { robotContSavedWorlds =
-                                           Seq.drop 1 savedWorlds }
+                                           Seq.drop dropCount savedWorlds }
           prepareNextRound savedWorld'
         Nothing ->
           case Seq.lookup 0 savedWorlds of
@@ -135,21 +165,39 @@ startNextRound = do
                     savedWorld { robotWorldRandom = robotWorldRandom world }
               prepareNextRound savedWorld'
             Nothing -> prepareNextRound world
-  lastMaxKills <- robotContLastMaxKills <$> State.get
   rounds <- robotContRounds <$> State.get
+  autoSaveMostKills <-
+    robotParamsAutoSaveMostKills . robotContParams <$> State.get
+  autoSaveHighestScore <-
+    robotParamsAutoSaveHighestScore . robotContParams <$> State.get
+  autoSaveHighestScoreIndividual <-
+    robotParamsAutoSaveHighestScoreIndividual . robotContParams <$> State.get
   newLastMaxKills <- do
-    if robotWorldKills world > lastMaxKills
+    if robotWorldKills world >= lastMaxKills
       then do
-        State.modify $ \cont ->
-                         cont { robotContAutoSave = Just (world, rounds) }
+        if autoSaveMostKills
+          then State.modify $ \cont ->
+                 cont { robotContAutoSave = Just (world, rounds) }
+          else return ()
         return $ robotWorldKills world
-      else do
-        State.modify $ \cont -> cont { robotContAutoSave = Nothing }
-        return lastMaxKills
+      else return lastMaxKills
+  newLastMaxScore <- case highestScoreRobot of
+    Just robot -> do
+      if autoSaveHighestScore
+        then State.modify $ \cont ->
+               cont { robotContAutoSave = Just (world, rounds) }
+        else return ()
+      if autoSaveHighestScoreIndividual
+        then State.modify $ \cont ->
+               cont { robotContAutoSaveIndividual = Just (robot, rounds) }
+        else return ()
+      return $ robotScore robot
+    Nothing -> robotContLastMaxScore <$> State.get
   world <- setupWorld
   State.modify $ \cont -> cont { robotContWorld = Just world,
                                  robotContRounds = rounds + 1,
-                                 robotContLastMaxKills = newLastMaxKills }
+                                 robotContLastMaxKills = newLastMaxKills,
+                                 robotContLastMaxScore = newLastMaxScore }
 
 -- | Clean up after a world.
 cleanupWorld :: RobotWorld -> RobotWorld

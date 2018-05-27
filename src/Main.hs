@@ -281,6 +281,15 @@ mainLoop cont canvas worldRef controlQueue exitQueue nextTime play savePath = do
             Left errorText -> hPutStr stderr errorText
             Right () -> return ()
         Nothing -> return ()
+      case robotContAutoSaveIndividual cont' of
+        Just (saveRobot, saveRounds) -> do
+          message <-
+            saveRobotToFile (printf "%s.%d.individual" savePath saveRounds)
+            saveRobot
+          case message of
+            Left errorText -> hPutStr stderr errorText
+            Right () -> return ()
+        Nothing -> return ()          
       writeIORef worldRef (world `seq` Just world)
       Gdk.threadsAddIdle PRIORITY_HIGH $ do
         window <- Gtk.widgetGetWindow canvas
@@ -494,7 +503,21 @@ nextState cont play =
 saveWorldToFile :: FilePath -> RobotWorld -> IO (Either Text.Text ())
 saveWorldToFile path world = do
   let worldText =
-        saveWorld specialConstEntries (fmap robotExpr (robotWorldRobots world))
+        saveWorld specialConstEntries . fmap robotExpr $ robotWorldRobots world
+  saveFile <- catch (Right <$> openFile path WriteMode)
+              (\e -> return . Left . Text.pack $ show (e :: IOException))
+  case saveFile of
+    Right saveFile -> do
+      hPutStr saveFile worldText
+      hClose saveFile
+      return $ Right ()
+    Left errorText -> do
+      return $ Left errorText
+
+-- | Save a robot.
+saveRobotToFile :: FilePath -> Robot -> IO (Either Text.Text ())
+saveRobotToFile path expr = do
+  let worldText = saveWorld specialConstEntries . Seq.singleton $ robotExpr expr
   saveFile <- catch (Right <$> openFile path WriteMode)
               (\e -> return . Left . Text.pack $ show (e :: IOException))
   case saveFile of

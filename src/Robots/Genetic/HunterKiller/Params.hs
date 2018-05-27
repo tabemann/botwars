@@ -42,6 +42,7 @@ import qualified Data.Text as Text
 import qualified Data.Sequence as Seq
 import Data.Sequence ((<|))
 import qualified Data.Attoparsec.Text as Atto
+import qualified Data.Attoparsec.Combinator as AttoComb
 import Data.Functor ((<$>))
 import Data.Foldable (foldl')
 import Control.Applicative ((<*>),
@@ -55,6 +56,7 @@ import Text.Printf as Printf
 defaultParams :: RobotParams
 defaultParams =
   RobotParams { robotParamsMaxCyclesPerSecond = 100.0,
+                robotParamsAutoSave = True,
                 robotParamsOversizeRadius = 2.0,
                 robotParamsAimRadius = 4.0,
                 robotParamsLabelRadius = 5.0,
@@ -184,6 +186,9 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
   if name ==  "maxCyclesPerSecond"
   then parseLoBoundFloat 0.0 entry $
        \value -> params { robotParamsMaxCyclesPerSecond = value }
+  else if name == "autoSave"
+  then parseBool entry $
+       \value -> params { robotParamsAutoSave = value }
   else if name == "oversizeRadius"
   then parseLoBoundFloat 0.0 entry $
        \value -> params { robotParamsOversizeRadius = value }
@@ -523,6 +528,14 @@ loadParam (Right params) entry@(RobotConfigEntry name _) =
        Printf.printf "%s: unknown configuration parameter" name
 loadParam (Left errorMessage) _ = Left errorMessage
 
+-- | Parse a boolean value.
+parseBool :: RobotConfigEntry -> (Bool -> RobotParams) ->
+             Either Text.Text RobotParams
+parseBool (RobotConfigEntry _ (RobotConfigBool value)) func =
+  Right $ func value
+parseBool (RobotConfigEntry name _) _ =
+  Left . Text.pack $ Printf.printf "%s: not a boolean" name
+
 -- | Parse a floating-point value.
 parseFloat :: RobotConfigEntry -> (Double -> RobotParams) ->
               Either Text.Text RobotParams
@@ -647,6 +660,8 @@ parsePolynomial (RobotConfigEntry name (RobotConfigVector values)) func =
         convertRobotConfigValueIntoDouble _ = 0.0
 parsePolynomial (RobotConfigEntry name (RobotConfigNum value)) func =
   Right . func $ mkPolynomial [value]
+parsePolynomial (RobotConfigEntry name (RobotConfigBool _)) _ =
+  Left . Text.pack $ Printf.printf "%s: not a polynomial" name
 
 -- | Parse configuration.
 parseConfig :: Atto.Parser (Seq.Seq RobotConfigEntry)
@@ -672,7 +687,19 @@ parseConfigValue :: Atto.Parser RobotConfigValue
 parseConfigValue =
   Atto.skipSpace *>
   Atto.choice [RobotConfigNum <$> Atto.double,
+               RobotConfigBool <$> parseConfigBool,
                RobotConfigVector <$> parseConfigVector]
+
+-- | Parse a configuration boolean.
+parseConfigBool :: Atto.Parser Bool
+parseConfigBool =
+  Atto.skipSpace *>
+  Atto.choice [const True <$> Atto.string "true",
+               const False <$> Atto.string "false"] <*
+  Atto.choice [const undefined <$> Atto.skipSpace,
+               const undefined <$> Atto.endOfLine,
+               const undefined <$> Atto.endOfInput,
+               const undefined <$> AttoComb.lookAhead (Atto.char ',')]
 
 -- | Parse a configuration vector.
 parseConfigVector :: Atto.Parser (Seq.Seq RobotConfigValue)

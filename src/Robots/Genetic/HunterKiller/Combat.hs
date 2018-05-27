@@ -1,4 +1,4 @@
--- Copyright (c) 2017, Travis Bemann
+-- Copyright (c) 2017-2018, Travis Bemann
 -- All rights reserved.
 -- 
 -- Redistribution and use in source and binary forms, with or without
@@ -58,6 +58,9 @@ initCont programs params gen = do
   RobotCont { robotContParams = params,
               robotContRandom = gen,
               robotContWorld = Nothing,
+              robotContRounds = 0,
+              robotContLastMaxKills = 0,
+              robotContAutoSave = Nothing,
               robotContPrevWorlds = Seq.empty,
               robotContPrograms = programs,
               robotContSavedWorlds = Seq.empty }
@@ -68,6 +71,7 @@ executeCycle cont =
   State.runState executeCycle' cont
   where
     executeCycle' = do
+      State.modify $ \cont -> cont { robotContAutoSave = Nothing }
       world <- robotContWorld <$> State.get
       case world of
         Nothing -> do
@@ -131,8 +135,21 @@ startNextRound = do
                     savedWorld { robotWorldRandom = robotWorldRandom world }
               prepareNextRound savedWorld'
             Nothing -> prepareNextRound world
+  lastMaxKills <- robotContLastMaxKills <$> State.get
+  rounds <- robotContRounds <$> State.get
+  newLastMaxKills <- do
+    if robotWorldKills world > lastMaxKills
+      then do
+        State.modify $ \cont ->
+                         cont { robotContAutoSave = Just (world, rounds) }
+        return $ robotWorldKills world
+      else do
+        State.modify $ \cont -> cont { robotContAutoSave = Nothing }
+        return lastMaxKills
   world <- setupWorld
-  State.modify $ \cont -> cont { robotContWorld = Just world }
+  State.modify $ \cont -> cont { robotContWorld = Just world,
+                                 robotContRounds = rounds + 1,
+                                 robotContLastMaxKills = newLastMaxKills }
 
 -- | Clean up after a world.
 cleanupWorld :: RobotWorld -> RobotWorld

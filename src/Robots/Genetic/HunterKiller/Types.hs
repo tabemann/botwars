@@ -87,6 +87,9 @@ data RobotCont =
   RobotCont { robotContParams :: !RobotParams,
               robotContRandom :: !Random.StdGen,
               robotContWorld :: !(Maybe RobotWorld),
+              robotContRounds :: !Int,
+              robotContLastMaxKills :: !Int,
+              robotContAutoSave :: !(Maybe (RobotWorld, Int)),
               robotContPrograms :: !(Seq.Seq RobotExpr),
               robotContPrevWorlds :: !(Seq.Seq RobotWorld),
               robotContSavedWorlds :: !(Seq.Seq RobotWorld) }
@@ -110,6 +113,7 @@ data RobotMutate =
 -- | Robot parameters
 data RobotParams =
   RobotParams { robotParamsMaxCyclesPerSecond :: !Double,
+                robotParamsAutoSave :: !Bool,
                 robotParamsOversizeRadius :: !Double,
                 robotParamsAimRadius :: !Double,
                 robotParamsLabelRadius :: !Double,
@@ -308,6 +312,7 @@ data RobotConfigEntry = RobotConfigEntry !Text.Text !RobotConfigValue
 
 -- | Robot config value
 data RobotConfigValue = RobotConfigNum !Double
+                      | RobotConfigBool !Bool
                       | RobotConfigVector !(Seq.Seq RobotConfigValue)
 
 -- | Polynomial

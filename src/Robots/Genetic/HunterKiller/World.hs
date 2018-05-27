@@ -217,8 +217,8 @@ collideRobotWithShots robot shots = do
   if health > 0.0
     then return $ (robot { robotHealth = health,
                            robotScore = robotScore robot +
-                             (shotHarm *
-                              robotParamsDamagedScoreFactor params),
+                             (min 1.0 shotHarm) *
+                             robotParamsDamagedScoreFactor params,
                            robotLocationDelta =
                              addVector (robotLocationDelta robot)
                              totalTransferVector },
@@ -328,7 +328,8 @@ updateRobotForHits hits params robot =
   foldl' (\robot (shot, harm) ->
              if shotRobotIndex shot == robotIndex robot
              then robot { robotScore = robotScore robot +
-                          ((robotParamsHitScoreFactor params) * harm) }
+                                       ((robotParamsHitScoreFactor params) *
+                                        (min 1.0 harm)) }
              else robot)
     robot hits
 

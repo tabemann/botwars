@@ -208,20 +208,20 @@ setup exprs params savePath = do
   Gtk.onButtonClicked forwardButton $
     atomically $ writeTQueue controlQueue RobotForward
   Gtk.onButtonClicked saveButton $ do
-    atomically . writeTQueue controlQueue $ RobotSave savePath
-    -- fileChooser <- Gtk.fileChooserNativeNew (Just "Save As World")
-    --   (Just window) Gtk.FileChooserActionSave Nothing
-    --   Nothing
-    -- result <- toEnum <$> fromIntegral <$> Gtk.nativeDialogRun fileChooser
-    -- case result of
-    --   Gtk.ResponseTypeAccept -> do
-    --     filename <- Gtk.fileChooserGetFilename fileChooser
-    --     case filename of
-    --       Just filename -> do
-    --         let !message = deepseq filename `seq` RobotSave filename
-    --         atomically $ writeTQueue controlQueue message
-    --       Nothing -> return ()
-    --   _ -> return ()
+    --atomically . writeTQueue controlQueue $ RobotSave savePath
+    fileChooser <- Gtk.fileChooserNativeNew (Just "Save As World")
+      (Just window) Gtk.FileChooserActionSave Nothing
+      Nothing
+    result <- toEnum <$> fromIntegral <$> Gtk.nativeDialogRun fileChooser
+    case result of
+      Gtk.ResponseTypeAccept -> do
+        filename <- Gtk.fileChooserGetFilename fileChooser
+        case filename of
+          Just filename -> do
+            let !message = deepseq filename `seq` RobotSave filename
+            atomically $ writeTQueue controlQueue message
+          Nothing -> return ()
+      _ -> return ()
   Gtk.boxPackStart buttonBox backwardButton False False 0
   Gtk.boxPackStart buttonBox stopButton False False 0
   Gtk.boxPackStart buttonBox startButton False False 0
@@ -242,15 +242,15 @@ setup exprs params savePath = do
                       robotPlayIndex = 0,
                       robotPlayDoStep = RobotNoStep }
     mainLoop (initCont exprs params gen) canvas worldRef controlQueue
-      exitQueue time play
+      exitQueue time play savePath
   exitStatus <- atomically $ readTQueue exitQueue
   exitWith exitStatus
 
 -- | Execute the main loop of the genetically-programmed robot fighting arena.
 mainLoop :: RobotCont -> Gtk.DrawingArea -> IORef (Maybe RobotWorld) ->
             TQueue RobotControl -> TQueue ExitCode -> Clock.TimeSpec ->
-            RobotPlay -> IO ()
-mainLoop cont canvas worldRef controlQueue exitQueue nextTime play = do
+            RobotPlay -> FilePath -> IO ()
+mainLoop cont canvas worldRef controlQueue exitQueue nextTime play savePath = do
   let params = robotContParams cont
   control <- atomically $ tryReadTQueue controlQueue
   case control of
@@ -264,13 +264,23 @@ mainLoop cont canvas worldRef controlQueue exitQueue nextTime play = do
             Right () -> return ()
         Nothing -> return ()
       mainLoop cont canvas worldRef controlQueue exitQueue nextTime play
+        savePath
     Just control ->
       let play' = changePlay control play params
       in mainLoop cont canvas worldRef controlQueue exitQueue nextTime play'
+         savePath
     Nothing -> do
       let displayInfo =
             robotPlayRunning play || (robotPlayDoStep play /= RobotNoStep)
       (cont', world, play) <- nextState cont play
+      case robotContAutoSave cont' of
+        Just (saveWorld, saveRounds) -> do
+          message <- saveWorldToFile (printf "%s.%d" savePath saveRounds)
+                     saveWorld
+          case message of
+            Left errorText -> hPutStr stderr errorText
+            Right () -> return ()
+        Nothing -> return ()
       writeIORef worldRef (world `seq` Just world)
       Gdk.threadsAddIdle PRIORITY_HIGH $ do
         window <- Gtk.widgetGetWindow canvas
@@ -310,6 +320,7 @@ mainLoop cont canvas worldRef controlQueue exitQueue nextTime play = do
             then time
             else nextTime'
       mainLoop cont' canvas worldRef controlQueue exitQueue nextTime'' play
+        savePath
 
 -- | Change the playback state.
 changePlay :: RobotControl -> RobotPlay -> RobotParams -> RobotPlay

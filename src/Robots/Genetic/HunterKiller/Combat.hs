@@ -136,14 +136,15 @@ startNextRound = do
   if (not alwaysMoreKills && not alwaysHigherScore &&
       robotWorldKills world >= minKills) ||
      (alwaysMoreKills && robotWorldKills world >= lastMaxKills) ||
-     (alwaysHigherScore && isJust hasHighestScoreRobot)
+     (alwaysHigherScore && isJust highestScoreRobot)
     then do
       State.modify $ \cont -> cont { robotContSavedWorlds =
                                        Seq.take savedWorldCount
                                        (world <| savedWorlds) }
       prepareNextRound world
     else
-      case Seq.lookup 1 savedWorlds of
+      case Seq.lookup (if alwaysMoreKills || alwaysHigherScore then 0 else 1)
+           savedWorlds of
         Just savedWorld -> do
           let savedWorld' =
                 savedWorld { robotWorldRandom = robotWorldRandom world }
@@ -152,12 +153,15 @@ startNextRound = do
                                            Seq.drop dropCount savedWorlds }
           prepareNextRound savedWorld'
         Nothing ->
-          case Seq.lookup 0 savedWorlds of
-            Just savedWorld -> do
-              let savedWorld' =
-                    savedWorld { robotWorldRandom = robotWorldRandom world }
-              prepareNextRound savedWorld'
-            Nothing -> prepareNextRound world
+          if not alwaysMoreKills && not alwaysHigherScore
+          then
+            case Seq.lookup 0 savedWorlds of
+              Just savedWorld -> do
+                let savedWorld' =
+                      savedWorld { robotWorldRandom = robotWorldRandom world }
+                prepareNextRound savedWorld'
+              Nothing -> prepareNextRound world
+          else prepareNextRound world
   rounds <- robotContRounds <$> State.get
   autoSaveMostKills <-
     robotParamsAutoSaveMostKills . robotContParams <$> State.get

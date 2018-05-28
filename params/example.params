@@ -2,3 +2,7 @@ autoSaveHighestScore = true
 autoSaveHighestScoreIndividual = true
 alwaysMoreKills = false
 alwaysHigherScore = true
+thrustScoreFactor = 0.0
+turnScoreFactor = 0.0
+reproduction = [5, 3, 2]
+mutatedReproduction = [5, 3, 2]

@@ -36,6 +36,7 @@ module Robots.Genetic.HunterKiller.Types
    RobotStep (..),
    RobotWorld (..),
    RobotCont (..),
+   RobotAutoSave (..),
    RobotMutate (..),
    RobotParams (..),
    RobotConstEntry (..),
@@ -90,11 +91,15 @@ data RobotCont =
               robotContRounds :: !Int,
               robotContLastMaxKills :: !Int,
               robotContLastMaxScore :: !Double,
-              robotContAutoSave :: !(Maybe (RobotWorld, Int)),
-              robotContAutoSaveIndividual :: !(Maybe (Robot, Int)),
               robotContPrograms :: !(Seq.Seq RobotExpr),
               robotContPrevWorlds :: !(Seq.Seq RobotWorld),
               robotContSavedWorlds :: !(Seq.Seq RobotWorld) }
+
+-- | Robot autosave type
+data RobotAutoSave =
+  RobotAutoSave { robotAutoSaveRound :: !Int,
+                  robotAutoSaveWorld :: !(Maybe RobotWorld),
+                  robotAutoSaveRobot :: !(Maybe Robot) }
 
 -- | Robot world type
 data RobotWorld =
@@ -114,7 +119,9 @@ data RobotMutate =
 
 -- | Robot parameters
 data RobotParams =
-  RobotParams { robotParamsMaxCyclesPerSecond :: !Double,
+  RobotParams { robotParamsAutoSavePath :: FilePath,
+                robotParamsBackupSavePath :: FilePath,
+                robotParamsMaxCyclesPerSecond :: !Double,
                 robotParamsAutoSaveMostKills :: !Bool,
                 robotParamsAutoSaveHighestScore :: !Bool,
                 robotParamsAutoSaveHighestScoreIndividual :: !Bool,
@@ -307,7 +314,7 @@ data RobotAction =
 
 -- | Robot event
 data RobotEvent = RobotWorldCycle !RobotWorld
-                | RobotRoundDone !RobotWorld
+                | RobotRoundDone !RobotWorld !RobotAutoSave
 
 -- | Robot cycle state
 data RobotCycleState = RobotNextCycle

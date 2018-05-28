@@ -55,7 +55,9 @@ import Text.Printf as Printf
 -- | Default parameters
 defaultParams :: RobotParams
 defaultParams =
-  RobotParams { robotParamsMaxCyclesPerSecond = 100.0,
+  RobotParams { robotParamsAutoSavePath = "default.world",
+                robotParamsBackupSavePath = "backup.world",
+                robotParamsMaxCyclesPerSecond = 100.0,
                 robotParamsAutoSaveMostKills = True,
                 robotParamsAutoSaveHighestScore = True,
                 robotParamsAutoSaveHighestScoreIndividual = True,

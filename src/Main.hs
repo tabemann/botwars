@@ -106,7 +106,8 @@ main :: IO ()
 main = do
   inputs <- getInputs
   case inputs of
-    Right (exprs, params, savePath) -> setup exprs params savePath
+    Right (exprs, params, savePath) ->
+      setup exprs $ params { robotParamsAutoSavePath = savePath }
     Left errorText -> do
       hPutStr stderr errorText
       exitFailure
@@ -161,8 +162,8 @@ getInputs = do
               progName
 
 -- | Set up the UI and prepare for running.
-setup :: Seq.Seq RobotExpr -> RobotParams -> FilePath -> IO ()
-setup exprs params savePath = do
+setup :: Seq.Seq RobotExpr -> RobotParams -> IO ()
+setup exprs params = do
   controlQueue <- newTQueueIO
   exitQueue <- newTQueueIO
   Gtk.init Nothing
@@ -208,7 +209,6 @@ setup exprs params savePath = do
   Gtk.onButtonClicked forwardButton $
     atomically $ writeTQueue controlQueue RobotForward
   Gtk.onButtonClicked saveButton $ do
-    --atomically . writeTQueue controlQueue $ RobotSave savePath
     fileChooser <- Gtk.fileChooserNativeNew (Just "Save As World")
       (Just window) Gtk.FileChooserActionSave Nothing
       Nothing
@@ -242,15 +242,15 @@ setup exprs params savePath = do
                       robotPlayIndex = 0,
                       robotPlayDoStep = RobotNoStep }
     mainLoop (initCont exprs params gen) canvas worldRef controlQueue
-      exitQueue time play savePath
+      exitQueue time play
   exitStatus <- atomically $ readTQueue exitQueue
   exitWith exitStatus
 
 -- | Execute the main loop of the genetically-programmed robot fighting arena.
 mainLoop :: RobotCont -> Gtk.DrawingArea -> IORef (Maybe RobotWorld) ->
             TQueue RobotControl -> TQueue ExitCode -> Clock.TimeSpec ->
-            RobotPlay -> FilePath -> IO ()
-mainLoop cont canvas worldRef controlQueue exitQueue nextTime play savePath = do
+            RobotPlay -> IO ()
+mainLoop cont canvas worldRef controlQueue exitQueue nextTime play = do
   let params = robotContParams cont
   control <- atomically $ tryReadTQueue controlQueue
   case control of
@@ -264,32 +264,13 @@ mainLoop cont canvas worldRef controlQueue exitQueue nextTime play savePath = do
             Right () -> return ()
         Nothing -> return ()
       mainLoop cont canvas worldRef controlQueue exitQueue nextTime play
-        savePath
     Just control ->
       let play' = changePlay control play params
       in mainLoop cont canvas worldRef controlQueue exitQueue nextTime play'
-         savePath
     Nothing -> do
       let displayInfo =
             robotPlayRunning play || (robotPlayDoStep play /= RobotNoStep)
       (cont', world, play) <- nextState cont play
-      case robotContAutoSave cont' of
-        Just (saveWorld, saveRounds) -> do
-          message <- saveWorldToFile (printf "%s.%d" savePath saveRounds)
-                     saveWorld
-          case message of
-            Left errorText -> hPutStr stderr errorText
-            Right () -> return ()
-        Nothing -> return ()
-      case robotContAutoSaveIndividual cont' of
-        Just (saveRobot, saveRounds) -> do
-          message <-
-            saveRobotToFile (printf "%s.%d.individual" savePath saveRounds)
-            saveRobot
-          case message of
-            Left errorText -> hPutStr stderr errorText
-            Right () -> return ()
-        Nothing -> return ()          
       writeIORef worldRef (world `seq` Just world)
       Gdk.threadsAddIdle PRIORITY_HIGH $ do
         window <- Gtk.widgetGetWindow canvas
@@ -329,7 +310,6 @@ mainLoop cont canvas worldRef controlQueue exitQueue nextTime play savePath = do
             then time
             else nextTime'
       mainLoop cont' canvas worldRef controlQueue exitQueue nextTime'' play
-        savePath
 
 -- | Change the playback state.
 changePlay :: RobotControl -> RobotPlay -> RobotParams -> RobotPlay
@@ -383,8 +363,8 @@ nextState cont play =
                   play' = play { robotPlayIndex = 0 }
               world <- case event of
                 RobotWorldCycle world -> return world
-                RobotRoundDone world -> do
-                  saveWorldToFile "backup.world" world >> return ()
+                RobotRoundDone world autoSave -> do
+                  doRoundDone world autoSave $ robotContParams cont
                   return world
               return (cont', world, play')
             else
@@ -428,8 +408,8 @@ nextState cont play =
                              robotPlayDoStep = RobotNoStep }
           world <- case event of
             RobotWorldCycle world -> return world
-            RobotRoundDone world -> do
-              saveWorldToFile "backup.world" world >> return ()
+            RobotRoundDone world autoSave -> do
+              doRoundDone world autoSave $ robotContParams cont
               return world
           return (cont', world, play')
         else
@@ -473,8 +453,8 @@ nextState cont play =
                       play'' = play' { robotPlayIndex = 0 }
                   world <- case event of
                     RobotWorldCycle world -> return world
-                    RobotRoundDone world -> do
-                      saveWorldToFile "backup.world" world >> return ()
+                    RobotRoundDone world autoSave -> do
+                      doRoundDone world autoSave $ robotContParams cont
                       return world
                   return (cont', world, play'')
       RobotNoStep ->
@@ -486,8 +466,8 @@ nextState cont play =
               let (event, cont') = executeCycle cont
               world <- case event of
                 RobotWorldCycle world -> return world
-                RobotRoundDone world -> do
-                  saveWorldToFile "backup.world" world >> return ()
+                RobotRoundDone world autoSave -> do
+                  doRoundDone world autoSave $ robotContParams cont
                   return world
               return (cont', world, play)
         else do
@@ -498,6 +478,31 @@ nextState cont play =
                   Just world -> world
                   Nothing -> error "impossible"
           return (cont, world, play)
+
+-- | Handle round done.
+doRoundDone :: RobotWorld -> RobotAutoSave -> RobotParams -> IO ()
+doRoundDone world autoSave params = do
+  saveWorldToFile (robotParamsBackupSavePath params) world >> return ()
+  doAutoSave (robotParamsAutoSavePath params) autoSave
+
+-- | Do autosave if needed.
+doAutoSave :: FilePath -> RobotAutoSave -> IO ()
+doAutoSave path autoSave = do
+  let round = robotAutoSaveRound autoSave
+  case robotAutoSaveWorld autoSave of
+    Just world -> do
+      message <- saveWorldToFile (printf "%s.%d" path round) world
+      case message of
+        Left errorText -> hPutStr stderr errorText
+        Right () -> return ()
+    Nothing -> return ()
+  case robotAutoSaveRobot autoSave of
+    Just robot -> do
+      message <- saveRobotToFile (printf "%s.%d.individual" path round) robot
+      case message of
+        Left errorText -> hPutStr stderr errorText
+        Right () -> return ()
+    Nothing -> return ()          
 
 -- | Save a world.
 saveWorldToFile :: FilePath -> RobotWorld -> IO (Either Text.Text ())
